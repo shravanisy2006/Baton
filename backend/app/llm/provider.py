@@ -42,8 +42,10 @@ class GeminiProvider(Provider):
 
     def __init__(self, api_key: str, model: str):
         from google import genai  # imported lazily so tests don't need it
+        from google.genai import types
 
-        self.client = genai.Client(api_key=api_key)
+        # Never wait forever on a busy model: give up after 90 s and let the backup model try.
+        self.client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=90_000))
         self.model = model
 
     def generate(self, system: str, prompt: str, schema: type[BaseModel]) -> str:
@@ -138,8 +140,9 @@ def call_json(db: Session, task: str, system: str, prompt: str, schema: type[T])
                 msg = str(e)
                 errors.append(f"{provider.model}: {msg[:160]}")
                 log.warning("AI call failed on %s: %s", provider.model, msg[:300])
-                if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
-                    time.sleep(2)
+                if ("429" in msg or "RESOURCE_EXHAUSTED" in msg or "503" in msg) and attempt == 0:
+                    time.sleep(3)
+                    continue  # one short retry on the same model, then the backup
                 break  # try next provider
             db.merge(LLMCache(key=key, task=task, model=f"{provider.name}:{provider.model}",
                               response=result.model_dump()))

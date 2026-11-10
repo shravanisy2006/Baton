@@ -100,7 +100,7 @@ function Side({ claims, label, newer, winner }: { claims: Claim[]; label: string
 const KIND_LABEL: Record<string, string> = {
   status: "Status conflict",
   owner: "Owner conflict",
-  superseded: "Timeline: a newer decision may replace an older one",
+  superseded: "Timeline: something newer may replace an older decision",
 };
 
 function ConflictCard({ k, canResolve, onDone }: { k: Conflict; canResolve: boolean; onDone: () => void }) {
@@ -111,7 +111,7 @@ function ConflictCard({ k, canResolve, onDone }: { k: Conflict; canResolve: bool
   const sideB = k.side_b?.length ? k.side_b : k.claim_b ? [k.claim_b] : [];
   const won = (side: Claim[]) => !!k.winner_claim_id && side.some((c) => c.id === k.winner_claim_id);
   const labelA = k.kind === "superseded" ? "Older decision" : "Source A says";
-  const labelB = k.kind === "superseded" ? "Newer decision" : "Source B says";
+  const labelB = k.kind === "superseded" ? "Newer decision / instruction" : "Source B says";
 
   async function resolve(body: { winner_claim_id?: string; keep_both?: boolean }, key: string) {
     setBusy(key);

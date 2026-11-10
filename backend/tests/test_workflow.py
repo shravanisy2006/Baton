@@ -128,7 +128,9 @@ def test_conflict_and_gaps_detected(client, demo):
     assert all(c["confidence"] == "conflicting" for c in status[0]["side_a"] + status[0]["side_b"])
     assert status[0]["newer_side"] == "b"  # the "not done" side has the newer evidence
     superseded = [k for k in conflicts if k["kind"] == "superseded"]
-    assert len(superseded) == 1 and "switched back on" in superseded[0]["side_b"][0]["statement"]
+    # Two newer messages replace the same older decision -> still ONE timeline conflict.
+    assert len(superseded) == 1 and len(superseded[0]["side_b"]) == 2
+    assert any("switched back on" in c["statement"] for c in superseded[0]["side_b"])
     assert len([g for g in client.get(f"/projects/{demo['project_id']}/gaps", headers=tok).json()["gaps"]
                 if g["kind"] == "conflict"]) == 2  # one question per conflict, not per pair
     gaps = client.get(f"/projects/{demo['project_id']}/gaps", headers=tok).json()["gaps"]

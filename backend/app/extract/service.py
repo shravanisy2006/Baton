@@ -60,7 +60,9 @@ Strict rules:
 6. status: only for task and blocker claims: todo, in_progress, done, blocked, reopened or unknown.
 7. owner: the person or handle named in the evidence as responsible, else null. Never invent an owner.
 8. rationale: for decisions, the reason stated in the evidence, else null.
-9. Skip greetings, chit-chat and anything not useful for continuing the work."""
+9. If a later item changes, reverses or ends an earlier decision (for example "we will switch payments back on"),
+   extract that later item as a decision too, with the same subject as the earlier one.
+10. Skip greetings, chit-chat and anything not useful for continuing the work."""
 
 MAX_BATCH_CHARS = 12000
 

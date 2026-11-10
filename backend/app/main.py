@@ -26,10 +26,29 @@ log = logging.getLogger("baton")
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
+    _fail_interrupted_jobs()
     if get_settings().app_secret.startswith("dev-only"):
         log.warning("APP_SECRET is the development default. Set a long random APP_SECRET in production.")
     log.info("Baton API ready. AI: %s", ai_status())
     yield
+
+
+def _fail_interrupted_jobs() -> None:
+    """A job still 'running' at startup was cut off by a restart; mark it failed so it can be re-run."""
+    from datetime import datetime, timezone
+
+    from .db import SessionLocal
+    from .models import Job
+
+    with SessionLocal() as db:
+        stuck = db.query(Job).filter(Job.status.in_(("queued", "running"))).all()
+        for j in stuck:
+            j.status = "failed"
+            j.error = "The server restarted while this analysis was running. Press Re-run analysis."
+            j.finished_at = datetime.now(timezone.utc)
+        db.commit()
+        if stuck:
+            log.warning("Marked %d interrupted analysis job(s) as failed.", len(stuck))
 
 
 app = FastAPI(

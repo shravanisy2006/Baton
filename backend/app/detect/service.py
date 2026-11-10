@@ -61,6 +61,17 @@ def _source_desc(claim: Claim) -> str:
     return f"{ev.source.filename}{d}"
 
 
+def _same_work(a: Claim, b: Claim) -> bool:
+    """Do two claims describe the same piece of work (not just the same topic)?"""
+    return fuzz.token_set_ratio(a.statement, b.statement) >= 70 or fuzz.token_set_ratio(
+        " ".join(x.quote for x in a.citations), " ".join(x.quote for x in b.citations)) >= 75
+
+
+def _same_work_loose(c: Claim, anchors: list[Claim]) -> bool:
+    """A not-done item that follows up on a reopened/blocked one (e.g. 'the fix isn't started')."""
+    return any(fuzz.partial_ratio(c.subject, a.subject) >= 90 for a in anchors)
+
+
 def _groups(claims: list[Claim]) -> list[list[Claim]]:
     """Group claims about the same subject (transitively), so one topic gives one conflict."""
     groups: list[list[Claim]] = []
@@ -98,11 +109,27 @@ def detect_conflicts(db: Session, project_id: str, claims: list[Claim]) -> list[
     usable = [c for c in claims if valid_citations(c) and c.support in ("supports", "partial")]
     found: list[Conflict] = []
 
-    # Status: within one topic, "done" on one side vs "not done" on the other -> ONE conflict.
+    # Status: within one topic, "done" vs "not done" about the SAME piece of work -> ONE conflict.
+    # Different tasks that merely share a topic ("add the flag" done, "turn the flag on" to do) are not a
+    # conflict, and a newer "done" after an older "to do" is ordinary progress.
     tasks = [c for c in usable if c.type in ("task", "blocker") and c.status]
     for g in _groups(tasks):
         done = [c for c in g if c.status in DONE]
         not_done = [c for c in g if c.status in NOT_DONE]
+        if not done or not not_done:
+            continue
+        explicit = [c for c in not_done if c.status in ("reopened", "blocked")]
+        latest_done = max((claim_date(c) or "" for c in done), default="")
+        same_work = [c for c in not_done if c in explicit or any(_same_work(c, d) for d in done)]
+        newer_not_done = [c for c in same_work if c in explicit or (claim_date(c) or "") >= latest_done]
+        if not explicit and not newer_not_done:
+            continue  # unrelated tasks on one topic, or progress (done is the newest word)
+        if explicit:
+            not_done = [c for c in not_done if c in explicit or any(_same_work(c, x) for x in explicit + done)
+                        or _same_work_loose(c, explicit)]
+        else:
+            not_done = newer_not_done
+        done = [d for d in done if any(_same_work(d, c) for c in not_done) or explicit]
         if done and not_done:
             k = _make(project_id, "status", done, not_done, "")
             newer = {"a": "done", "b": "not done"}.get(k.newer_side or "", None)
@@ -114,14 +141,16 @@ def detect_conflicts(db: Session, project_id: str, claims: list[Claim]) -> list[
             )
             found.append(k)
 
-    # Owner: within one topic, two or more different owners -> ONE conflict.
+    # Owner: within one topic, the SAME piece of work with two or more different owners -> ONE conflict.
     owned = [c for c in usable if c.type in ("task", "owner") and c.owner]
     for g in _groups(owned):
         clusters: list[list[Claim]] = []
         for c in g:
             home = next((cl for cl in clusters if _names_match(cl[0].owner, c.owner)), None)
             (home.append(c) if home else clusters.append([c]))
-        if len(clusters) >= 2:
+        clashing = len(clusters) >= 2 and any(
+            _same_work(a, b) for i, x in enumerate(clusters) for y in clusters[i + 1:] for a in x for b in y)
+        if clashing:
             a, b = clusters[0], [c for cl in clusters[1:] for c in cl]
             found.append(_make(project_id, "owner", a, b,
                                f"Different owners for '{g[0].subject}': "
@@ -142,25 +171,33 @@ class SupersedeResult(BaseModel):
     verdicts: list[PairVerdict]
 
 
-SUPERSEDE_SYSTEM = """You check whether a NEWER project decision replaces or reverses an OLDER one about the same topic.
-replaces: the newer decision changes, reverses or ends the older one, so following the older one would now be wrong.
+SUPERSEDE_SYSTEM = """You check whether a NEWER project decision or instruction replaces or reverses an OLDER decision
+about the same topic.
+replaces: the newer item changes, reverses or ends the older decision (including when the older decision's condition
+has now been met and the newer item acts on that), so someone following only the older decision would now do the wrong thing.
 compatible: both can be true at the same time (one adds detail, implements or repeats the other).
 unclear: the quotes don't let you tell. Judge only from the quotes given. Give a short reason."""
 
 
 def detect_supersessions(db: Session, project_id: str, claims: list[Claim]) -> tuple[list[Conflict], list[str]]:
-    """Timeline check: flag an older decision that a newer decision on the same topic may have replaced."""
-    decisions = [c for c in claims if c.type == "decision" and valid_citations(c)
-                 and c.support in ("supports", "partial") and claim_date(c)]
+    """Timeline check: flag an older decision that a newer decision or instruction on the same topic may
+    have replaced (e.g. "keep payments off until the MoU" -> later "turn payments back on on 20 Nov")."""
+    dated = [c for c in claims if valid_citations(c) and c.support in ("supports", "partial") and claim_date(c)]
+    decisions = [c for c in dated if c.type == "decision"]
+    later_items = [c for c in dated if c.type in ("decision", "task")]
     pairs: list[tuple[Claim, Claim]] = []
-    for i, a in enumerate(decisions):
-        for b in decisions[i + 1:]:
-            if not same_subject(a.subject, b.subject) or claim_date(a) == claim_date(b):
+    seen: set[tuple[str, str]] = set()
+    for older in decisions:
+        for newer in later_items:
+            if newer is older or claim_date(newer) <= claim_date(older):
                 continue
-            if fuzz.token_set_ratio(a.statement, b.statement) >= 80:
+            if not same_subject(older.subject, newer.subject):
+                continue
+            if fuzz.token_set_ratio(older.statement, newer.statement) >= 80:
                 continue  # same decision restated
-            older, newer = (a, b) if claim_date(a) < claim_date(b) else (b, a)
-            pairs.append((older, newer))
+            if (older.id, newer.id) not in seen:
+                seen.add((older.id, newer.id))
+                pairs.append((older, newer))
     if not pairs:
         return [], []
 
@@ -176,14 +213,20 @@ def detect_supersessions(db: Session, project_id: str, claims: list[Claim]) -> t
     except (AIUnavailable, InvalidAIOutput) as e:
         return [], [f"Timeline (supersession) check skipped: {e}"]
     verdicts = {v.pair_ref.strip().upper(): v for v in result.verdicts}
+    replaced = [(o, w, verdicts[f"P{n}"].reason) for n, (o, w) in enumerate(pairs, start=1)
+                if verdicts.get(f"P{n}") and verdicts[f"P{n}"].verdict == "replaces"]
+    # One timeline conflict per topic: every replaced older decision vs every newer item that replaces it.
     found = []
-    for n, (older, newer) in enumerate(pairs, start=1):
-        v = verdicts.get(f"P{n}")
-        if not v or v.verdict != "replaces":
+    for group in _groups(list({c.id: c for o, w, _ in replaced for c in (o, w)}.values())):
+        ids = {c.id for c in group}
+        rows = [(o, w, r) for o, w, r in replaced if o.id in ids]
+        olds = list({o.id: o for o, _, _ in rows}.values())
+        news = [w for w in {w.id: w for _, w, _ in rows}.values() if w.id not in {o.id for o in olds}]
+        if not olds or not news:
             continue
-        k = _make(project_id, "superseded", [older], [newer],
-                  f"A newer decision ({_source_desc(newer)}) may replace an older one ({_source_desc(older)}). "
-                  f"Older: \"{older.statement}\" Newer: \"{newer.statement}\" Why: {v.reason}")
+        k = _make(project_id, "superseded", olds, news,
+                  f"Newer evidence on '{olds[0].subject}' ({_side_text(news)}) may replace an older decision "
+                  f"({_side_text(olds)}). Why: {rows[0][2]}")
         k.newer_side = "b"
         found.append(k)
         db.add(k)

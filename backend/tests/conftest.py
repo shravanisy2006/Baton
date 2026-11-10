@@ -68,9 +68,15 @@ def fake_extract(prompt: str) -> dict:
     add("I have not started the fix yet", type="task", subject="excel export",
         statement="The chunked-writes fix for the Excel export has not been started.", status="todo")
     # A newer decision that reverses the older payments decision (timeline check):
-    add("we will switch online payments back on after the fest", type="decision", subject="payments",
+    add("we will switch online payments back on after the fest", type="task", subject="payments",
         statement="Online payments will be switched back on after the fest because the MoU is signed.",
-        rationale="The sponsor signed the MoU.")
+        status="todo", owner="Karan")
+    add("Add PAYMENTS_ENABLED flag (default false)", type="task", subject="payments flag",
+        statement="Add the PAYMENTS_ENABLED flag with default false and hide the checkout button.", status="done",
+        owner="riya-dev")
+    add("I'll turn the flag on on 20 November after testing checkout", type="task", subject="payments flag",
+        statement="Karan will turn PAYMENTS_ENABLED on on 20 November after testing checkout.",
+        status="todo", owner="Karan")
     # A quote with altered words: must be rejected by the word-for-word check.
     meeting2 = _find(u, "Riya owns the registration API")
     if meeting2:
@@ -102,7 +108,7 @@ def fake_support(prompt: str) -> dict:
 def fake_supersede(prompt: str) -> dict:
     verdicts = []
     for m in re.finditer(r"^(P\d+) OLDER.*?\n\s+NEWER.*?: (.*?) -- ", prompt, re.M):
-        verdict = "replaces" if "switched back on" in m.group(2) else "compatible"
+        verdict = "replaces" if ("switched back on" in m.group(2) or "turn PAYMENTS_ENABLED on" in m.group(2)) else "compatible"
         verdicts.append({"pair_ref": m.group(1), "verdict": verdict, "reason": "scripted test verdict"})
     return {"verdicts": verdicts}
 
