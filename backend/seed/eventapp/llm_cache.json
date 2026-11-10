@@ -1,0 +1,1532 @@
+[
+ {
+  "key": "cc30c600a8ebf33877a406ee083284a913234772f4bf6007dd8710cde66309c6",
+  "task": "check",
+  "model": "gemini:gemini-3.5-flash-lite",
+  "response": {
+   "claims": [
+    {
+     "type": "decision",
+     "subject": "online payments",
+     "statement": "Online payments are kept disabled until the sponsor MoU is signed because the sponsor asked to pause.",
+     "status": null,
+     "owner": null,
+     "rationale": "the sponsor asked us to pause",
+     "citations": [
+      {
+       "evidence_id": "E-1",
+       "quote": "keep online payments disabled until the sponsor MoU is signed, because the sponsor asked us to pause."
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "key": "005daf6ed366a829501022eb93110550f4fca562b3e37a8bac936f9bf92c27e7",
+  "task": "extract",
+  "model": "gemini:gemini-3.5-flash-lite",
+  "response": {
+   "claims": [
+    {
+     "type": "blocker",
+     "subject": "online payments",
+     "statement": "Online payments are paused because the sponsor asked us to hold payments until the MoU is signed.",
+     "status": "blocked",
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-1",
+       "quote": "Online payments are paused because the sponsor asked us to hold payments until the MoU is signed."
+      }
+     ]
+    },
+    {
+     "type": "decision",
+     "subject": "online payments",
+     "statement": "Keep online payments disabled with the PAYMENTS_ENABLED flag set to false until the sponsor MoU is signed.",
+     "status": null,
+     "owner": null,
+     "rationale": "the sponsor asked us to pause payments",
+     "citations": [
+      {
+       "evidence_id": "E-2",
+       "quote": "Decision: keep online payments disabled with the PAYMENTS_ENABLED flag set to false until the sponsor MoU is signed."
+      },
+      {
+       "evidence_id": "E-13",
+       "quote": "The sponsor asked us to pause payments until the MoU is signed."
+      },
+      {
+       "evidence_id": "E-22",
+       "quote": "We decided to keep online payments switched off until the sponsor MoU is signed, because the sponsor asked us to pause payments."
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "sponsor mou follow-up",
+     "statement": "Someone needs to follow up with the sponsor about when the MoU will be signed.",
+     "status": "todo",
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-3",
+       "quote": "Someone needs to follow up with the sponsor about when the MoU will be signed."
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "attendee excel export",
+     "statement": "The attendee Excel export was marked Done last week.",
+     "status": "done",
+     "owner": "Riya",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-4",
+       "quote": "The attendee Excel export was marked Done last week. Riya built it."
+      }
+     ]
+    },
+    {
+     "type": "owner",
+     "subject": "registration api and deploy scripts",
+     "statement": "Riya owns the registration API and the deploy scripts.",
+     "status": null,
+     "owner": "Riya",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-5",
+       "quote": "Riya owns the registration API and the deploy scripts."
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "backend handover",
+     "statement": "Karan will take over the backend after Riya leaves at the end of October.",
+     "status": "todo",
+     "owner": "Karan",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-6",
+       "quote": "Karan will take over the backend after Riya leaves at the end of October."
+      }
+     ]
+    },
+    {
+     "type": "risk",
+     "subject": "registrations table schema",
+     "statement": "Do not change the registrations table schema before the fest because the check-in app reads it directly.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-7",
+       "quote": "Do not change the registrations table schema before the fest. The check-in app reads it directly."
+      }
+     ]
+    },
+    {
+     "type": "open_question",
+     "subject": "offline check-in",
+     "statement": "Open question on whether we support offline check-in at the venue as nobody has decided yet.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-8",
+       "quote": "Open question: do we support offline check-in at the venue? Nobody has decided yet."
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "attendee excel export",
+     "statement": "Task Export attendees to Excel is marked as Done.",
+     "status": "done",
+     "owner": "riya-dev",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-9",
+       "quote": "Task: Export attendees to Excel | Assignee: riya-dev | Status: Done | Updated: 2026-09-20"
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "rate limiting",
+     "statement": "Task Rate limiting on the registration API is in progress.",
+     "status": "in_progress",
+     "owner": "riya-dev",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-10",
+       "quote": "Task: Rate limiting on the registration API | Assignee: riya-dev | Status: In progress | Updated: 2026-10-01"
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "qr check-in screen",
+     "statement": "Task QR check-in screen is in progress.",
+     "status": "in_progress",
+     "owner": "anika",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-11",
+       "quote": "Task: QR check-in screen | Assignee: anika | Status: In progress | Updated: 2026-10-04"
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "email confirmation template",
+     "statement": "Task Email confirmation template for registrations is set to to do.",
+     "status": "todo",
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-12",
+       "quote": "Task: Email confirmation template for registrations | Status: To do | Updated: 2026-09-28"
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "attendee excel export",
+     "statement": "The attendee excel export task is reopened because it times out and corrupts the file above 500 rows.",
+     "status": "reopened",
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-14",
+       "quote": "Reopening this. The attendee Excel export works for small events, but above 500 rows it times out and the downloaded file is corrupted. This task is not done."
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "attendee excel export fix",
+     "statement": "The fix for write rows in chunks has not been started yet.",
+     "status": "todo",
+     "owner": "riya-dev",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-15",
+       "quote": "The fix is to write rows in chunks instead of building the whole sheet in memory. I have not started the fix yet."
+      }
+     ]
+    },
+    {
+     "type": "decision",
+     "subject": "payments enabled flag",
+     "statement": "Add PAYMENTS_ENABLED flag with default false and hide the checkout button when it is off.",
+     "status": null,
+     "owner": "riya-dev",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-16",
+       "quote": "Add PAYMENTS_ENABLED flag (default false) and hide the checkout button when it is off."
+      }
+     ]
+    },
+    {
+     "type": "dependency",
+     "subject": "backend hosting",
+     "statement": "The backend runs on Render and deploys automatically from the main branch.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-17",
+       "quote": "The backend runs on Render and deploys automatically from the main branch."
+      }
+     ]
+    },
+    {
+     "type": "recurring_problem",
+     "subject": "ci build test api token",
+     "statement": "The CI build fails every Monday because the test API token expires weekly.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-18",
+       "quote": "Known issue: the CI build fails every Monday because the test API token expires weekly. Refresh TEST_API_TOKEN in the repository secrets and re-run the build."
+      }
+     ]
+    },
+    {
+     "type": "dependency",
+     "subject": "mobile check-in app endpoint",
+     "statement": "The mobile check-in app depends on the /v2/attendees endpoint so it must not be renamed or removed before the fest.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-19",
+       "quote": "The mobile check-in app depends on the /v2/attendees endpoint. Do not rename or remove it before the fest."
+      }
+     ]
+    },
+    {
+     "type": "owner",
+     "subject": "deploy scripts",
+     "statement": "Riya Sharma owns the deploy scripts in scripts/deploy.sh and notes they should only be run from the main branch.",
+     "status": null,
+     "owner": "Riya Sharma",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-20",
+       "quote": "I own the deploy scripts in scripts/deploy.sh. Only run them from the main branch."
+      }
+     ]
+    },
+    {
+     "type": "blocker",
+     "subject": "rate limiting",
+     "statement": "Rate limiting on the registration API is blocked on the Redis add-on that the club has not paid for.",
+     "status": "blocked",
+     "owner": "Riya Sharma",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-21",
+       "quote": "Rate limiting on the registration API is half done. The limiter works but has no tests yet, and it is blocked on the Redis add-on that the club has not paid for."
+      }
+     ]
+    },
+    {
+     "type": "contact",
+     "subject": "sponsor contact",
+     "statement": "Arjun Rao is the Head of Partnerships at the sponsor company and the sponsor contact for the MoU.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-23",
+       "quote": "Our sponsor contact for the MoU is Arjun Rao, Head of Partnerships at the sponsor company (arjun.rao@example.org)."
+      }
+     ]
+    },
+    {
+     "type": "risk",
+     "subject": "sponsorship budget",
+     "statement": "The sponsorship budget is Rs 40,000 and must not be shared outside the leads group.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-24",
+       "quote": "The sponsorship budget is Rs 40,000. Do not share the amount outside the leads group."
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "key": "2c7e0a8a867030ce1e62ddaab7cbb3537b72d3a719049e46d65cca0329a8fc20",
+  "task": "support",
+  "model": "gemini:gemini-3.5-flash-lite",
+  "response": {
+   "verdicts": [
+    {
+     "claim_ref": "C-1",
+     "verdict": "supports",
+     "reason": "The quote matches the claim completely."
+    },
+    {
+     "claim_ref": "C-2",
+     "verdict": "supports",
+     "reason": "The quotes confirm the decision, the flag, and the reason provided."
+    },
+    {
+     "claim_ref": "C-3",
+     "verdict": "supports",
+     "reason": "The quote directly states the claim."
+    },
+    {
+     "claim_ref": "C-4",
+     "verdict": "supports",
+     "reason": "The quote supports the status and owner mentioned in the claim."
+    },
+    {
+     "claim_ref": "C-5",
+     "verdict": "supports",
+     "reason": "The quote confirms Riya owns both items."
+    },
+    {
+     "claim_ref": "C-6",
+     "verdict": "supports",
+     "reason": "The quote matches the claim regarding Karan taking over after Riya leaves."
+    },
+    {
+     "claim_ref": "C-7",
+     "verdict": "supports",
+     "reason": "The quote matches the risk statement."
+    },
+    {
+     "claim_ref": "C-8",
+     "verdict": "supports",
+     "reason": "The quote matches the open question claim."
+    },
+    {
+     "claim_ref": "C-9",
+     "verdict": "supports",
+     "reason": "The quote matches task name, assignee, and status."
+    },
+    {
+     "claim_ref": "C-10",
+     "verdict": "supports",
+     "reason": "The quote matches the task details."
+    },
+    {
+     "claim_ref": "C-11",
+     "verdict": "supports",
+     "reason": "The quote matches the task details."
+    },
+    {
+     "claim_ref": "C-12",
+     "verdict": "supports",
+     "reason": "The quote matches the task status."
+    },
+    {
+     "claim_ref": "C-13",
+     "verdict": "supports",
+     "reason": "The quote states the task is reopened and explains why."
+    },
+    {
+     "claim_ref": "C-14",
+     "verdict": "partial",
+     "reason": "The quote confirms the fix has not started, but does not explicitly mention the owner riya-dev."
+    },
+    {
+     "claim_ref": "C-15",
+     "verdict": "supports",
+     "reason": "The decision details match the quote."
+    },
+    {
+     "claim_ref": "C-16",
+     "verdict": "supports",
+     "reason": "The quote matches the dependency and deployment claim."
+    },
+    {
+     "claim_ref": "C-17",
+     "verdict": "supports",
+     "reason": "The quote matches the recurring problem description."
+    },
+    {
+     "claim_ref": "C-18",
+     "verdict": "supports",
+     "reason": "The quote matches the dependency and warning details."
+    },
+    {
+     "claim_ref": "C-19",
+     "verdict": "supports",
+     "reason": "The quote matches the ownership and instructions for deploy scripts."
+    },
+    {
+     "claim_ref": "C-20",
+     "verdict": "partial",
+     "reason": "The quote states the task is blocked and mentions the reason, but does not state the owner as Riya Sharma."
+    }
+   ]
+  }
+ },
+ {
+  "key": "c6e85ed9248a35dd7dabc0980f0f0234cbd65f9e89f910a8b0625b9527dee406",
+  "task": "support",
+  "model": "gemini:gemini-3.5-flash-lite",
+  "response": {
+   "verdicts": [
+    {
+     "claim_ref": "C-21",
+     "verdict": "supports",
+     "reason": "The quote explicitly states that Arjun Rao is the Head of Partnerships and the sponsor contact for the MoU."
+    },
+    {
+     "claim_ref": "C-22",
+     "verdict": "supports",
+     "reason": "The quote explicitly confirms the sponsorship budget amount and the restriction to not share it outside the leads group."
+    }
+   ]
+  }
+ },
+ {
+  "key": "9fef719baf513aebdc5cdc4448d927967f987e51b7597ce5c9f7cb2358695c66",
+  "task": "extract",
+  "model": "gemini:gemini-3.8-flash",
+  "response": {
+   "claims": [
+    {
+     "type": "decision",
+     "subject": "online payments",
+     "statement": "Online payments are kept disabled using the PAYMENTS_ENABLED flag until the sponsor MoU is signed.",
+     "status": null,
+     "owner": null,
+     "rationale": "The sponsor requested to pause payments until the MoU is signed.",
+     "citations": [
+      {
+       "evidence_id": "E-2",
+       "quote": "Decision: keep online payments disabled with the PAYMENTS_ENABLED flag set to false until the sponsor MoU is signed."
+      },
+      {
+       "evidence_id": "E-13",
+       "quote": "The sponsor asked us to pause payments until the MoU is signed. Keep the payment code behind the PAYMENTS_ENABLED flag"
+      },
+      {
+       "evidence_id": "E-22",
+       "quote": "We decided to keep online payments switched off until the sponsor MoU is signed, because the sponsor asked us to pause payments."
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "online payments",
+     "statement": "Karan will enable online payments by setting PAYMENTS_ENABLED to true on 20 November after testing checkout.",
+     "status": "todo",
+     "owner": "Karan",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-26",
+       "quote": "Karan, please set PAYMENTS_ENABLED to true on 20 November and test checkout first."
+      },
+      {
+       "evidence_id": "E-27",
+       "quote": "Got it, I'll turn the flag on on 20 November after testing checkout."
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "sponsor mou",
+     "statement": "Someone needs to follow up with the sponsor regarding when the MoU will be signed.",
+     "status": "todo",
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-3",
+       "quote": "Someone needs to follow up with the sponsor about when the MoU will be signed."
+      }
+     ]
+    },
+    {
+     "type": "contact",
+     "subject": "sponsor mou",
+     "statement": "Arjun Rao, Head of Partnerships at the sponsor company, is the contact for the MoU.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-23",
+       "quote": "Our sponsor contact for the MoU is Arjun Rao, Head of Partnerships at the sponsor company (arjun.rao@example.org)."
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "excel export",
+     "statement": "The attendee Excel export feature was built by Riya and marked as done.",
+     "status": "done",
+     "owner": "riya-dev",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-4",
+       "quote": "The attendee Excel export was marked Done last week. Riya built it."
+      },
+      {
+       "evidence_id": "E-9",
+       "quote": "Task: Export attendees to Excel | Assignee: riya-dev | Status: Done | Updated: 2026-09-20"
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "excel export",
+     "statement": "The Excel export task was reopened because it times out and corrupts downloads for events above 500 rows.",
+     "status": "reopened",
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-14",
+       "quote": "Reopening this. The attendee Excel export works for small events, but above 500 rows it times out and the downloaded file is corrupted. This task is not done."
+      },
+      {
+       "evidence_id": "E-15",
+       "quote": "Confirmed the export fails above 500 rows. The fix is to write rows in chunks instead of building the whole sheet in memory."
+      }
+     ]
+    },
+    {
+     "type": "owner",
+     "subject": "registration api",
+     "statement": "Riya owns the registration API.",
+     "status": null,
+     "owner": "Riya",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-5",
+       "quote": "Riya owns the registration API and the deploy scripts."
+      }
+     ]
+    },
+    {
+     "type": "owner",
+     "subject": "deploy scripts",
+     "statement": "Riya owns the deploy scripts located in scripts/deploy.sh.",
+     "status": null,
+     "owner": "Riya",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-5",
+       "quote": "Riya owns the registration API and the deploy scripts."
+      },
+      {
+       "evidence_id": "E-20",
+       "quote": "I own the deploy scripts in scripts/deploy.sh. Only run them from the main branch."
+      }
+     ]
+    },
+    {
+     "type": "owner",
+     "subject": "backend",
+     "statement": "Karan will take over ownership of the backend after Riya leaves at the end of October.",
+     "status": null,
+     "owner": "Karan",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-6",
+       "quote": "Karan will take over the backend after Riya leaves at the end of October."
+      }
+     ]
+    },
+    {
+     "type": "risk",
+     "subject": "registrations table schema",
+     "statement": "The registrations table schema should not be modified before the fest because the check-in app reads it directly.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-7",
+       "quote": "Do not change the registrations table schema before the fest. The check-in app reads it directly."
+      }
+     ]
+    },
+    {
+     "type": "open_question",
+     "subject": "offline check-in",
+     "statement": "It remains undecided whether offline check-in will be supported at the venue.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-8",
+       "quote": "Open question: do we support offline check-in at the venue? Nobody has decided yet."
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "rate limiting",
+     "statement": "Rate limiting on the registration API is in progress with the limiter functioning but untested.",
+     "status": "in_progress",
+     "owner": "riya-dev",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-10",
+       "quote": "Task: Rate limiting on the registration API | Assignee: riya-dev | Status: In progress | Updated: 2026-10-01"
+      },
+      {
+       "evidence_id": "E-21",
+       "quote": "Rate limiting on the registration API is half done. The limiter works but has no tests yet"
+      }
+     ]
+    },
+    {
+     "type": "blocker",
+     "subject": "rate limiting",
+     "statement": "Rate limiting on the registration API is blocked by an unpaid Redis add-on.",
+     "status": "blocked",
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-21",
+       "quote": "it is blocked on the Redis add-on that the club has not paid for."
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "qr check-in screen",
+     "statement": "Work on the QR check-in screen is in progress by Anika.",
+     "status": "in_progress",
+     "owner": "anika",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-11",
+       "quote": "Task: QR check-in screen | Assignee: anika | Status: In progress | Updated: 2026-10-04"
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "email confirmation template",
+     "statement": "The email confirmation template for registrations needs to be completed.",
+     "status": "todo",
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-12",
+       "quote": "Task: Email confirmation template for registrations | Status: To do | Updated: 2026-09-28"
+      }
+     ]
+    },
+    {
+     "type": "recurring_problem",
+     "subject": "ci build",
+     "statement": "The CI build fails every Monday because the test API token expires on a weekly basis.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-18",
+       "quote": "the CI build fails every Monday because the test API token expires weekly. Refresh TEST_API_TOKEN in the repository secrets and re-run the build."
+      },
+      {
+       "evidence_id": "E-28",
+       "quote": "Heads up: the CI build failed again on Monday because the test API token expired. I refreshed it."
+      }
+     ]
+    },
+    {
+     "type": "dependency",
+     "subject": "attendees endpoint",
+     "statement": "The mobile check-in app depends on the /v2/attendees endpoint and must not be renamed or removed before the fest.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-19",
+       "quote": "The mobile check-in app depends on the /v2/attendees endpoint. Do not rename or remove it before the fest."
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "key": "6f4baaff39a86df3da550a91a380186117cd64ee40c7c164323cd7f9381bac2d",
+  "task": "support",
+  "model": "gemini:gemini-3.5-flash-lite",
+  "response": {
+   "verdicts": [
+    {
+     "claim_ref": "C-1",
+     "verdict": "supports",
+     "reason": "The quotes clearly state keeping payments disabled via the flag until the MoU is signed because the sponsor asked to pause."
+    },
+    {
+     "claim_ref": "C-2",
+     "verdict": "supports",
+     "reason": "The quotes explicitly state Karan will set PAYMENTS_ENABLED to true on 20 November after testing checkout."
+    },
+    {
+     "claim_ref": "C-3",
+     "verdict": "supports",
+     "reason": "The quote matches the claim that someone needs to follow up with the sponsor regarding the MoU."
+    },
+    {
+     "claim_ref": "C-4",
+     "verdict": "supports",
+     "reason": "The quote confirms Arjun Rao is the contact and Head of Partnerships at the sponsor company."
+    },
+    {
+     "claim_ref": "C-5",
+     "verdict": "supports",
+     "reason": "The quotes confirm Riya built the attendee Excel export and it was marked done."
+    },
+    {
+     "claim_ref": "C-6",
+     "verdict": "supports",
+     "reason": "The quotes confirm the task was reopened due to timeout and corruption issues above 500 rows."
+    },
+    {
+     "claim_ref": "C-7",
+     "verdict": "supports",
+     "reason": "The quote explicitly states Riya owns the registration API."
+    },
+    {
+     "claim_ref": "C-8",
+     "verdict": "supports",
+     "reason": "The quotes confirm Riya owns the deploy scripts located in scripts/deploy.sh."
+    },
+    {
+     "claim_ref": "C-9",
+     "verdict": "supports",
+     "reason": "The quote explicitly states Karan will take over the backend after Riya leaves at the end of October."
+    },
+    {
+     "claim_ref": "C-10",
+     "verdict": "supports",
+     "reason": "The quote confirms the schema should not be changed because the check-in app reads it directly."
+    },
+    {
+     "claim_ref": "C-11",
+     "verdict": "supports",
+     "reason": "The quote confirms that offline check-in is an open question and nobody has decided yet."
+    },
+    {
+     "claim_ref": "C-12",
+     "verdict": "supports",
+     "reason": "The quotes show the task is in progress by riya-dev, and the rate limiter works but has no tests."
+    },
+    {
+     "claim_ref": "C-13",
+     "verdict": "supports",
+     "reason": "The quote explicitly states it is blocked on the unpaid Redis add-on."
+    },
+    {
+     "claim_ref": "C-14",
+     "verdict": "supports",
+     "reason": "The quote confirms the QR check-in screen task is in progress and assigned to anika."
+    },
+    {
+     "claim_ref": "C-15",
+     "verdict": "supports",
+     "reason": "The quote confirms the email confirmation template task has a status of To do."
+    },
+    {
+     "claim_ref": "C-16",
+     "verdict": "supports",
+     "reason": "The quotes confirm the CI build fails every Monday due to the test API token expiring weekly."
+    },
+    {
+     "claim_ref": "C-17",
+     "verdict": "supports",
+     "reason": "The quote states the mobile check-in app depends on the /v2/attendees endpoint and should not be renamed or removed before the fest."
+    }
+   ]
+  }
+ },
+ {
+  "key": "87268c15d4f9a098d6d6a77e36795ae23e39931be9ef120ca6a37be0e5c0446b",
+  "task": "extract",
+  "model": "gemini:gemini-3.5-flash-lite",
+  "response": {
+   "claims": [
+    {
+     "type": "decision",
+     "subject": "online payments",
+     "statement": "Online payments are paused because the sponsor asked us to hold payments until the MoU is signed.",
+     "status": null,
+     "owner": null,
+     "rationale": "the sponsor asked us to hold payments until the MoU is signed",
+     "citations": [
+      {
+       "evidence_id": "E-1",
+       "quote": "Online payments are paused because the sponsor asked us to hold payments until the MoU is signed."
+      }
+     ]
+    },
+    {
+     "type": "decision",
+     "subject": "online payments",
+     "statement": "Keep online payments disabled with the PAYMENTS_ENABLED flag set to false until the sponsor MoU is signed.",
+     "status": null,
+     "owner": null,
+     "rationale": "the sponsor MoU is signed",
+     "citations": [
+      {
+       "evidence_id": "E-2",
+       "quote": "Decision: keep online payments disabled with the PAYMENTS_ENABLED flag set to false until the sponsor MoU is signed."
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "sponsor",
+     "statement": "Someone needs to follow up with the sponsor about when the MoU will be signed.",
+     "status": "todo",
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-3",
+       "quote": "Someone needs to follow up with the sponsor about when the MoU will be signed."
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "attendee excel export",
+     "statement": "The attendee Excel export was marked Done last week.",
+     "status": "done",
+     "owner": "Riya",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-4",
+       "quote": "The attendee Excel export was marked Done last week. Riya built it."
+      }
+     ]
+    },
+    {
+     "type": "owner",
+     "subject": "registration api",
+     "statement": "Riya owns the registration API.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-5",
+       "quote": "Riya owns the registration API and the deploy scripts."
+      }
+     ]
+    },
+    {
+     "type": "owner",
+     "subject": "deploy scripts",
+     "statement": "Riya owns the deploy scripts.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-5",
+       "quote": "Riya owns the registration API and the deploy scripts."
+      }
+     ]
+    },
+    {
+     "type": "decision",
+     "subject": "backend",
+     "statement": "Karan will take over the backend after Riya leaves at the end of October.",
+     "status": null,
+     "owner": null,
+     "rationale": "Riya leaves at the end of October",
+     "citations": [
+      {
+       "evidence_id": "E-6",
+       "quote": "Karan will take over the backend after Riya leaves at the end of October."
+      }
+     ]
+    },
+    {
+     "type": "risk",
+     "subject": "registrations table schema",
+     "statement": "Do not change the registrations table schema before the fest because the check-in app reads it directly.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-7",
+       "quote": "Do not change the registrations table schema before the fest. The check-in app reads it directly."
+      }
+     ]
+    },
+    {
+     "type": "open_question",
+     "subject": "offline check-in",
+     "statement": "Open question on whether offline check-in is supported at the venue, as nobody has decided yet.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-8",
+       "quote": "Open question: do we support offline check-in at the venue? Nobody has decided yet."
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "attendee excel export",
+     "statement": "Task to export attendees to Excel is marked Done.",
+     "status": "done",
+     "owner": "riya-dev",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-9",
+       "quote": "Task: Export attendees to Excel | Assignee: riya-dev | Status: Done | Updated: 2026-09-20"
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "registration api",
+     "statement": "Task for rate limiting on the registration API is in progress.",
+     "status": "in_progress",
+     "owner": "riya-dev",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-10",
+       "quote": "Task: Rate limiting on the registration API | Assignee: riya-dev | Status: In progress | Updated: 2026-10-01"
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "qr check-in screen",
+     "statement": "Task for QR check-in screen is in progress.",
+     "status": "in_progress",
+     "owner": "anika",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-11",
+       "quote": "Task: QR check-in screen | Assignee: anika | Status: In progress | Updated: 2026-10-04"
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "email confirmation template",
+     "statement": "Task for email confirmation template for registrations has status to do.",
+     "status": "todo",
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-12",
+       "quote": "Task: Email confirmation template for registrations | Status: To do | Updated: 2026-09-28"
+      }
+     ]
+    },
+    {
+     "type": "decision",
+     "subject": "online payments",
+     "statement": "Dropping Razorpay for now and keeping the payment code behind the PAYMENTS_ENABLED flag.",
+     "status": null,
+     "owner": null,
+     "rationale": "The sponsor asked us to pause payments until the MoU is signed.",
+     "citations": [
+      {
+       "evidence_id": "E-13",
+       "quote": "Dropping Razorpay for now. The sponsor asked us to pause payments until the MoU is signed. Keep the payment code behind the PAYMENTS_ENABLED flag so we can switch it back on later."
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "attendee excel export",
+     "statement": "The attendee Excel export task is reopened because it times out and is corrupted above 500 rows.",
+     "status": "reopened",
+     "owner": "anika",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-14",
+       "quote": "Reopening this. The attendee Excel export works for small events, but above 500 rows it times out and the downloaded file is corrupted. This task is not done."
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "attendee excel export",
+     "statement": "The fix for the attendee excel export failing above 500 rows has not been started yet.",
+     "status": "todo",
+     "owner": "riya-dev",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-15",
+       "quote": "I have not started the fix yet."
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "online payments",
+     "statement": "Add PAYMENTS_ENABLED flag default false and hide the checkout button when it is off.",
+     "status": "done",
+     "owner": "riya-dev",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-16",
+       "quote": "Add PAYMENTS_ENABLED flag (default false) and hide the checkout button when it is off."
+      }
+     ]
+    },
+    {
+     "type": "dependency",
+     "subject": "backend",
+     "statement": "The backend runs on Render and deploys automatically from the main branch.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-17",
+       "quote": "The backend runs on Render and deploys automatically from the main branch."
+      }
+     ]
+    },
+    {
+     "type": "recurring_problem",
+     "subject": "ci build",
+     "statement": "The CI build fails every Monday because the test API token expires weekly.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-18",
+       "quote": "Known issue: the CI build fails every Monday because the test API token expires weekly."
+      }
+     ]
+    },
+    {
+     "type": "dependency",
+     "subject": "mobile check-in app",
+     "statement": "The mobile check-in app depends on the /v2/attendees endpoint which must not be renamed or removed before the fest.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-19",
+       "quote": "The mobile check-in app depends on the /v2/attendees endpoint. Do not rename or remove it before the fest."
+      }
+     ]
+    },
+    {
+     "type": "owner",
+     "subject": "deploy scripts",
+     "statement": "Riya Sharma owns the deploy scripts in scripts/deploy.sh.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-20",
+       "quote": "I own the deploy scripts in scripts/deploy.sh. Only run them from the main branch."
+      }
+     ]
+    },
+    {
+     "type": "blocker",
+     "subject": "registration api",
+     "statement": "Rate limiting on the registration API is blocked on the Redis add-on that the club has not paid for.",
+     "status": "blocked",
+     "owner": "Riya Sharma",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-21",
+       "quote": "Rate limiting on the registration API is half done. The limiter works but has no tests yet, and it is blocked on the Redis add-on that the club has not paid for."
+      }
+     ]
+    },
+    {
+     "type": "decision",
+     "subject": "online payments",
+     "statement": "We decided to keep online payments switched off until the sponsor MoU is signed, because the sponsor asked us to pause payments.",
+     "status": null,
+     "owner": null,
+     "rationale": "the sponsor asked us to pause payments",
+     "citations": [
+      {
+       "evidence_id": "E-22",
+       "quote": "We decided to keep online payments switched off until the sponsor MoU is signed, because the sponsor asked us to pause payments."
+      }
+     ]
+    },
+    {
+     "type": "contact",
+     "subject": "sponsor mou",
+     "statement": "Arjun Rao is the sponsor contact for the MoU and is the Head of Partnerships at the sponsor company.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-23",
+       "quote": "Our sponsor contact for the MoU is Arjun Rao, Head of Partnerships at the sponsor company (arjun.rao@example.org)."
+      }
+     ]
+    },
+    {
+     "type": "decision",
+     "subject": "sponsorship budget",
+     "statement": "The sponsorship budget is Rs 40,000 and must not be shared outside the leads group.",
+     "status": null,
+     "owner": null,
+     "rationale": "Do not share the amount outside the leads group",
+     "citations": [
+      {
+       "evidence_id": "E-24",
+       "quote": "The sponsorship budget is Rs 40,000. Do not share the amount outside the leads group."
+      }
+     ]
+    },
+    {
+     "type": "decision",
+     "subject": "online payments",
+     "statement": "We will switch online payments back on after the fest now that the sponsor signed the MoU.",
+     "status": null,
+     "owner": null,
+     "rationale": "the sponsor signed the MoU today",
+     "citations": [
+      {
+       "evidence_id": "E-25",
+       "quote": "Big news: the sponsor signed the MoU today!"
+      },
+      {
+       "evidence_id": "E-26",
+       "quote": "So we will switch online payments back on after the fest."
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "online payments",
+     "statement": "Karan please set PAYMENTS_ENABLED to true on 20 November and test checkout first.",
+     "status": "todo",
+     "owner": "Karan",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-26",
+       "quote": "Karan, please set PAYMENTS_ENABLED to true on 20 November and test checkout first."
+      }
+     ]
+    },
+    {
+     "type": "task",
+     "subject": "online payments",
+     "statement": "Karan acknowledged that he will turn the flag on on 20 November after testing checkout.",
+     "status": "todo",
+     "owner": "Karan Mehta",
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-27",
+       "quote": "Got it, I'll turn the flag on on 20 November after testing checkout."
+      }
+     ]
+    },
+    {
+     "type": "recurring_problem",
+     "subject": "ci build",
+     "statement": "The CI build failed again on Monday because the test API token expired, and Riya refreshed it.",
+     "status": null,
+     "owner": null,
+     "rationale": null,
+     "citations": [
+      {
+       "evidence_id": "E-28",
+       "quote": "Heads up: the CI build failed again on Monday because the test API token expired. I refreshed it."
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "key": "5bcfd6b1a7eebe5c091bc12f4ffc945dc58d78199af73d517aa2562c9dfbd9cb",
+  "task": "support",
+  "model": "gemini:gemini-3.5-flash-lite",
+  "response": {
+   "verdicts": [
+    {
+     "claim_ref": "C-1",
+     "verdict": "supports",
+     "reason": "The quote explicitly matches the claim statement and reason."
+    },
+    {
+     "claim_ref": "C-2",
+     "verdict": "supports",
+     "reason": "The quote fully matches the decision and reason."
+    },
+    {
+     "claim_ref": "C-3",
+     "verdict": "supports",
+     "reason": "The quote matches the task statement."
+    },
+    {
+     "claim_ref": "C-4",
+     "verdict": "supports",
+     "reason": "The quote states the task was marked done last week and built by Riya."
+    },
+    {
+     "claim_ref": "C-5",
+     "verdict": "supports",
+     "reason": "The quote explicitly states Riya owns the registration API."
+    },
+    {
+     "claim_ref": "C-6",
+     "verdict": "contradicts",
+     "reason": "E-5 says Riya owns the deploy scripts, but E-20 says 'I own the deploy scripts', which contradicts sole or definitive ownership by Riya depending on the speaker."
+    },
+    {
+     "claim_ref": "C-7",
+     "verdict": "supports",
+     "reason": "The quote directly supports the claim and reason."
+    },
+    {
+     "claim_ref": "C-8",
+     "verdict": "supports",
+     "reason": "The quote directly matches the risk and reason."
+    },
+    {
+     "claim_ref": "C-9",
+     "verdict": "supports",
+     "reason": "The quote matches the open question details."
+    },
+    {
+     "claim_ref": "C-10",
+     "verdict": "supports",
+     "reason": "The quote supports the task status being Done and owner being riya-dev."
+    },
+    {
+     "claim_ref": "C-11",
+     "verdict": "supports",
+     "reason": "The quote supports the status and owner of the task."
+    },
+    {
+     "claim_ref": "C-12",
+     "verdict": "supports",
+     "reason": "The quote matches the task status and owner."
+    },
+    {
+     "claim_ref": "C-13",
+     "verdict": "supports",
+     "reason": "The quote matches the task status as To do."
+    },
+    {
+     "claim_ref": "C-14",
+     "verdict": "supports",
+     "reason": "The quote supports the decision and reason provided."
+    },
+    {
+     "claim_ref": "C-15",
+     "verdict": "partial",
+     "reason": "The quote states the task is reopened due to timeout and corruption above 500 rows, but does not mention the owner is anika."
+    },
+    {
+     "claim_ref": "C-16",
+     "verdict": "partial",
+     "reason": "The quote states 'I have not started the fix yet' (status todo), but does not explicitly state riya-dev is the owner in this specific quote."
+    },
+    {
+     "claim_ref": "C-17",
+     "verdict": "partial",
+     "reason": "The quote describes adding the flag and hiding the button, but does not mention the status as done or owner as riya-dev."
+    },
+    {
+     "claim_ref": "C-18",
+     "verdict": "supports",
+     "reason": "The quote directly supports the dependency claim."
+    },
+    {
+     "claim_ref": "C-19",
+     "verdict": "supports",
+     "reason": "The quote supports the recurring problem claim and reason."
+    },
+    {
+     "claim_ref": "C-20",
+     "verdict": "supports",
+     "reason": "The quote directly supports the dependency claim."
+    }
+   ]
+  }
+ },
+ {
+  "key": "6d7936ae49f857b4b792998b0c658f4afaf4187ef101d767458d4dd9668cf38d",
+  "task": "support",
+  "model": "gemini:gemini-3.8-flash",
+  "response": {
+   "verdicts": [
+    {
+     "claim_ref": "C-22",
+     "verdict": "partial",
+     "reason": "The quote confirms the status is blocked on the unpaid Redis add-on, but does not state that Riya Sharma is the owner."
+    },
+    {
+     "claim_ref": "C-23",
+     "verdict": "supports",
+     "reason": "The quote directly confirms the decision and reason that online payments remain switched off until the sponsor MoU is signed because the sponsor asked to pause payments."
+    },
+    {
+     "claim_ref": "C-24",
+     "verdict": "supports",
+     "reason": "The quote directly confirms Arjun Rao is the sponsor contact for the MoU and Head of Partnerships at the sponsor company."
+    },
+    {
+     "claim_ref": "C-25",
+     "verdict": "supports",
+     "reason": "The quote directly confirms the sponsorship budget of Rs 40,000 and the instruction not to share the amount outside the leads group."
+    },
+    {
+     "claim_ref": "C-26",
+     "verdict": "supports",
+     "reason": "The quotes support that the sponsor signed the MoU today and that online payments will be switched back on after the fest."
+    },
+    {
+     "claim_ref": "C-27",
+     "verdict": "supports",
+     "reason": "The quote directly confirms the task assigned to Karan to set PAYMENTS_ENABLED to true on 20 November and test checkout first."
+    },
+    {
+     "claim_ref": "C-28",
+     "verdict": "partial",
+     "reason": "The quote confirms the acknowledgment and action, but does not state the full name or identity of the speaker as Karan Mehta."
+    },
+    {
+     "claim_ref": "C-29",
+     "verdict": "partial",
+     "reason": "The quote mentions CI build failure and that the speaker refreshed it ('I refreshed it'), but does not identify the person as Riya."
+    }
+   ]
+  }
+ },
+ {
+  "key": "650dd7412224afbd729fccaca7a6ac80ac395cb09d79780adb34ee14434380a3",
+  "task": "supersede",
+  "model": "gemini:gemini-3.5-flash-lite",
+  "response": {
+   "verdicts": [
+    {
+     "pair_ref": "P1",
+     "verdict": "compatible",
+     "reason": "Both state that online payments remain paused due to the sponsor MoU condition."
+    },
+    {
+     "pair_ref": "P2",
+     "verdict": "replaces",
+     "reason": "The older decision kept payments paused until the MoU was signed, while the newer decision notes the MoU is now signed and plans to switch payments back on."
+    },
+    {
+     "pair_ref": "P3",
+     "verdict": "compatible",
+     "reason": "The newer item acts on the condition of the older decision by scheduling the re-enabling of payments now that the MoU situation is progressing."
+    },
+    {
+     "pair_ref": "P4",
+     "verdict": "compatible",
+     "reason": "Karan's confirmation is consistent with and implements the instruction to turn on the flag."
+    },
+    {
+     "pair_ref": "P5",
+     "verdict": "compatible",
+     "reason": "Both express the same policy of keeping online payments disabled until the MoU is signed."
+    },
+    {
+     "pair_ref": "P6",
+     "verdict": "replaces",
+     "reason": "The older decision mandates keeping payments disabled until the MoU is signed, whereas the newer decision states the MoU is signed and payments will be turned back on."
+    },
+    {
+     "pair_ref": "P7",
+     "verdict": "compatible",
+     "reason": "Scheduling the enabling of PAYMENTS_ENABLED follows up on the previous decision to keep it disabled until the condition was met."
+    },
+    {
+     "pair_ref": "P8",
+     "verdict": "compatible",
+     "reason": "Karan's acknowledgment aligns with the instruction to enable the flag once conditions allow."
+    },
+    {
+     "pair_ref": "P9",
+     "verdict": "compatible",
+     "reason": "Both reflect the same ongoing status that payments are paused due to the MoU."
+    },
+    {
+     "pair_ref": "P10",
+     "verdict": "compatible",
+     "reason": "The newer item adds detail regarding the PAYMENTS_ENABLED flag conforming to the older dropped payment decision."
+    },
+    {
+     "pair_ref": "P11",
+     "verdict": "compatible",
+     "reason": "Both maintain the same stance on keeping online payments switched off due to the sponsor."
+    },
+    {
+     "pair_ref": "P12",
+     "verdict": "replaces",
+     "reason": "The older item dropped payments and kept them disabled, while the newer item reverses this because the MoU has now been signed."
+    },
+    {
+     "pair_ref": "P13",
+     "verdict": "compatible",
+     "reason": "Scheduling the flag to be turned on implements the intention of keeping code behind the flag to switch it back on later."
+    },
+    {
+     "pair_ref": "P14",
+     "verdict": "compatible",
+     "reason": "Karan acknowledging the future flag change is compatible with the previous plan to switch payments back on later."
+    },
+    {
+     "pair_ref": "P15",
+     "verdict": "replaces",
+     "reason": "The older decision kept payments off due to an unsigned MoU, whereas the newer decision states the MoU is signed and payments will be switched on."
+    },
+    {
+     "pair_ref": "P16",
+     "verdict": "compatible",
+     "reason": "Setting the flag to true implements the next step now that the MoU condition has been resolved."
+    },
+    {
+     "pair_ref": "P17",
+     "verdict": "compatible",
+     "reason": "Karan's agreement to turn the flag on is compatible with the instruction given."
+    },
+    {
+     "pair_ref": "P18",
+     "verdict": "compatible",
+     "reason": "The topics are different; one is about budget confidentiality and the other is about following up on the MoU."
+    },
+    {
+     "pair_ref": "P19",
+     "verdict": "compatible",
+     "reason": "Karan's response confirms and follows up on the decision to switch online payments back on."
+    }
+   ]
+  }
+ }
+]
