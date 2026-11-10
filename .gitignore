@@ -1,0 +1,24 @@
+# secrets
+.env
+.env.local
+*.env.local
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+backend/*.db
+backend/storage/
+
+# node
+node_modules/
+frontend/dist/
+
+# os
+.DS_Store
+Thumbs.db
+
+# build caches
+*.tsbuildinfo

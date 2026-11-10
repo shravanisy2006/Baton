@@ -1,0 +1,5 @@
+28/10/2026, 18:04 - Priya Nair: Big news: the sponsor signed the MoU today!
+28/10/2026, 18:06 - Priya Nair: So we will switch online payments back on after the fest. Karan, please set PAYMENTS_ENABLED to true on 20 November and test checkout first.
+28/10/2026, 18:07 - Karan Mehta: Got it, I'll turn the flag on on 20 November after testing checkout.
+29/10/2026, 09:12 - Riya Sharma: Heads up: the CI build failed again on Monday because the test API token expired. I refreshed it.
+29/10/2026, 09:13 - Anika Joshi: 👍

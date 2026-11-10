@@ -1,0 +1,5 @@
+Task,Assignee,Status,Updated
+Export attendees to Excel,riya-dev,Done,2026-09-20
+Rate limiting on the registration API,riya-dev,In progress,2026-10-01
+QR check-in screen,anika,In progress,2026-10-04
+Email confirmation template for registrations,,To do,2026-09-28
