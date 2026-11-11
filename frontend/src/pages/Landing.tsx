@@ -83,14 +83,20 @@ export default function Landing() {
           is shown honestly, and the new member only sees what they're allowed to see.
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Button onClick={demo} loading={busy === "demo"} disabled={!!busy} className="px-5 py-2.5 text-base">
-            Open the live demo <ArrowRight className="h-4 w-4" />
+          <Button onClick={guest} loading={busy === "guest"} disabled={!!busy} className="px-5 py-2.5 text-base">
+            Try it with your project <ArrowRight className="h-4 w-4" />
           </Button>
-          <Button variant="secondary" onClick={guest} loading={busy === "guest"} disabled={!!busy} className="px-5 py-2.5 text-base">
-            Hand over your own project
+          <Button
+            variant="secondary"
+            onClick={() => document.getElementById("how")?.scrollIntoView({ behavior: "smooth" })}
+            className="px-5 py-2.5 text-base"
+          >
+            See how it works
           </Button>
         </div>
-        <p className="mt-3 text-xs text-slate-500">No sign-up. The demo is a ready-made synthetic project; or bring your own files and name who is leaving and who is joining.</p>
+        <p className="mt-3 text-xs text-slate-500">
+          No sign-up. Name who is leaving and who is taking over, upload the project's files, and Baton guides you step by step.
+        </p>
         {server === "slow" && (
           <p className="mt-3 text-xs text-amber-700">The server is waking up (free hosting sleeps when idle). This can take up to a minute.</p>
         )}
@@ -104,7 +110,7 @@ export default function Landing() {
         )}
       </section>
 
-      <section className="border-y border-slate-100 bg-slate-50 py-14">
+      <section id="how" className="scroll-mt-4 border-y border-slate-100 bg-slate-50 py-14">
         <div className="mx-auto max-w-6xl px-5">
           <h2 className="text-center text-sm font-semibold uppercase tracking-wider text-slate-500">How it works</h2>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -120,6 +126,22 @@ export default function Landing() {
                 <p className="mt-1 text-sm text-slate-600">{s.text}</p>
               </div>
             ))}
+          </div>
+
+          <div className="mt-8 grid items-center gap-5 rounded-xl border border-brand-100 bg-white p-6 shadow-sm md:grid-cols-[1fr_auto]">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-brand-600">Worked example</div>
+              <h3 className="mt-1 text-lg font-semibold text-slate-900">EventApp: Riya is leaving, Karan is taking over</h3>
+              <p className="mt-1 text-sm text-slate-600">
+                A ready-made synthetic college-club project with 7 sources: meeting notes, a task board, GitHub activity, a runbook,
+                Riya's own notes, restricted sponsor notes and a WhatsApp chat. It already contains a wrong task status, a decision
+                that was later reversed, and an invented quote, so you can watch Baton catch each one. Switch between Priya (reviewer),
+                Riya (leaving) and Karan (joining) to see how each person's view differs.
+              </p>
+            </div>
+            <Button variant="secondary" onClick={demo} loading={busy === "demo"} disabled={!!busy} className="px-5 py-2.5">
+              Open the example <ArrowRight className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </section>

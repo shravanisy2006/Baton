@@ -66,3 +66,16 @@ mark.hl {
     break-inside: avoid;
   }
 }
+
+/* Step-by-step guide */
+.guide-target {
+  border-radius: 0.6rem;
+  animation: guide-pulse 1.6s ease-out infinite;
+}
+@keyframes guide-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.55); }
+  70% { box-shadow: 0 0 0 10px rgba(79, 70, 229, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
+}
+.guide-pop { animation: fade 0.25s ease-out; }
+@media print { .guide-pop { display: none; } }

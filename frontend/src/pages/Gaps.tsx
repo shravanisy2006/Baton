@@ -147,7 +147,7 @@ function ConflictCard({ k, canResolve, onDone }: { k: Conflict; canResolve: bool
       {canResolve && k.status === "open" && sideA.length > 0 && sideB.length > 0 && (
         <div className="mt-4 space-y-2 border-t border-slate-100 pt-4">
           <input className={input} placeholder="Note for the record (e.g. 'Task board was outdated')" value={note} onChange={(e) => setNote(e.target.value)} />
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2" data-guide="resolve">
             <Button size="sm" variant="success" loading={busy === "a"} onClick={() => resolve({ winner_claim_id: sideA[0].id }, "a")}>
               {k.kind === "superseded" ? "Older still applies" : "A is current"}
             </Button>
@@ -202,6 +202,7 @@ function GapCard({ g, isLeaver, canReview, onDone }: { g: Gap; isLeaver: boolean
       {g.status === "open" && isLeaver && (
         <form
           className="mt-3 space-y-2"
+          data-guide="gap-answer"
           onSubmit={(e) => {
             e.preventDefault();
             submit(`/gaps/${g.id}/answer`, { answer });

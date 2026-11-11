@@ -44,12 +44,12 @@ export default function HandoverPage() {
         actions={
           <div className="no-print flex flex-wrap gap-2">
             {canReview && (
-              <Button variant={d ? "secondary" : "primary"} loading={busy === "gen"} onClick={() => run("gen", () => api.post(`/projects/${pid}/handover/generate`))}>
+              <Button data-guide="generate" variant={d ? "secondary" : "primary"} loading={busy === "gen"} onClick={() => run("gen", () => api.post(`/projects/${pid}/handover/generate`))}>
                 <Sparkles className="h-4 w-4" /> {d ? "Regenerate draft" : "Generate handover"}
               </Button>
             )}
             {canReview && d?.status === "draft" && (
-              <Button variant="success" loading={busy === "approve"} onClick={() => run("approve", () => api.post(`/handover/${d.id}/approve`))}>
+              <Button data-guide="approve-handover" variant="success" loading={busy === "approve"} onClick={() => run("approve", () => api.post(`/handover/${d.id}/approve`))}>
                 <FileCheck2 className="h-4 w-4" /> Approve & share
               </Button>
             )}
@@ -114,7 +114,7 @@ export default function HandoverPage() {
                           <CheckCircle2 className="h-4 w-4" /> Acknowledged
                         </span>
                       ) : (
-                        <Button size="sm" variant="secondary" loading={busy === s.key} onClick={() => run(s.key, () => api.post(`/handover/${d.id}/ack`, { section: s.key }))}>
+                        <Button data-guide="ack" size="sm" variant="secondary" loading={busy === s.key} onClick={() => run(s.key, () => api.post(`/handover/${d.id}/ack`, { section: s.key }))}>
                           I've read this
                         </Button>
                       )}

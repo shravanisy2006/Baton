@@ -53,7 +53,7 @@ export default function OverviewPage() {
         }
         actions={
           canManage && (
-            <Button onClick={analyse} loading={starting} disabled={running || o.counts.sources === 0}>
+            <Button onClick={analyse} loading={starting} disabled={running || o.counts.sources === 0} data-guide="run-analysis-top">
               <Play className="h-4 w-4" /> {o.counts.claims ? "Re-run analysis" : "Run analysis"}
             </Button>
           )
@@ -61,6 +61,7 @@ export default function OverviewPage() {
       />
 
       {/* Workflow progress */}
+      <div data-guide="progress">
       <Card className="mb-6 p-4">
         <ol className="grid gap-3 sm:grid-cols-5">
           {o.steps.map((s, i) => (
@@ -78,6 +79,7 @@ export default function OverviewPage() {
           ))}
         </ol>
       </Card>
+      </div>
 
       {next && (
         <div className="mb-6">
@@ -220,7 +222,7 @@ function Members() {
         ))}
       </div>
       {role === "admin" && (
-        <form onSubmit={add} className="mt-4 grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto_auto]">
+        <form onSubmit={add} data-guide="people-form" className="mt-4 grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto_auto]">
           <input className={input} placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           <input className={input} placeholder="GitHub handle (optional)" value={form.handle} onChange={(e) => setForm({ ...form, handle: e.target.value })} />
           <select className={select} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} aria-label="Role">

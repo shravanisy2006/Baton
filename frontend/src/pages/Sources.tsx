@@ -163,6 +163,7 @@ function UploadPanel({ onDone }: { onDone: () => void }) {
             setFiles(Array.from(e.dataTransfer.files));
           }}
           onClick={() => fileRef.current?.click()}
+          data-guide="upload"
           className={cx(
             "mt-3 cursor-pointer rounded-lg border-2 border-dashed px-4 py-8 text-center text-sm transition",
             drag ? "border-brand-500 bg-brand-50" : "border-slate-200 hover:border-slate-300",
@@ -279,7 +280,7 @@ function GettingStarted({ hasSources }: { hasSources: boolean }) {
         <li>Run the analysis. Baton extracts claims, checks every quote, and flags gaps and conflicts for you to review.</li>
       </ol>
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <Button onClick={analyse} loading={busy} disabled={!hasSources}>
+        <Button onClick={analyse} loading={busy} disabled={!hasSources} data-guide="run-analysis">
           <Play className="h-4 w-4" /> Run analysis
         </Button>
         {!hasSources && (

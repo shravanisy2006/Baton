@@ -17,6 +17,7 @@ import { ProjectContext, ROLE_LABEL, useSession } from "../lib/session";
 import type { Overview } from "../lib/types";
 import { Button, cx, ErrorBox, Pill, Spinner } from "./ui";
 import Logo from "./Logo";
+import Guide from "./Guide";
 
 const NAV = [
   { to: "", label: "Overview", icon: LayoutDashboard, need: "any" },
@@ -84,6 +85,7 @@ export default function Layout() {
               key={n.to}
               to={`/p/${pid}${n.to ? "/" + n.to : ""}`}
               end={n.to === ""}
+              data-guide={`nav-${n.to || "overview"}`}
               className={({ isActive }) =>
                 cx(
                   "flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition",
@@ -119,6 +121,7 @@ export default function Layout() {
                 disabled={switching}
                 onChange={(e) => onSwitch(e.target.value)}
                 aria-label="Switch person"
+                data-guide="switch-person"
               >
                 {data.members.map((m) => (
                   <option key={m.user_id} value={m.user_id}>
@@ -139,6 +142,7 @@ export default function Layout() {
               <div key={data.me.user_id} className="fade-in">
                 <Outlet />
               </div>
+              <Guide />
             </ProjectContext.Provider>
           )}
         </main>

@@ -57,7 +57,7 @@ export default function Projects() {
             <Logo />
           </Link>
           <Button variant="secondary" onClick={async () => nav(`/p/${await startDemo()}`)}>
-            <Sparkles className="h-4 w-4" /> New demo copy
+            <Sparkles className="h-4 w-4" /> Open the worked example
           </Button>
         </div>
       </header>

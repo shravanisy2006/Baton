@@ -160,7 +160,7 @@ function ReviewPanel({ id, onDone }: { id: string; onDone: () => void }) {
               This claim failed verification. You can reject it, or approve it only as <b>Reviewer-asserted</b> with a reason.
             </Notice>
           )}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2" data-guide="review-actions">
             {!unverified ? (
               <Button variant="success" onClick={() => act("approve")} loading={busy && !mode} disabled={blocked}>
                 <Check className="h-4 w-4" /> Approve
@@ -199,6 +199,7 @@ function ReviewPanel({ id, onDone }: { id: string; onDone: () => void }) {
 
       {mode && (
         <form
+          data-guide="review-form"
           className="space-y-2 rounded-lg bg-slate-50 p-3"
           onSubmit={(e) => {
             e.preventDefault();
