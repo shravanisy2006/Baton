@@ -11,8 +11,8 @@ Team Pixels (JSPM's RSCOE, Pune) · We Code Coders hackathon, Round 2.
 
 | | |
 | --- | --- |
-| Live app | `<your Vercel URL>` |
-| API docs | `<your Render URL>/docs` |
+| Live app | https://baton-weld.vercel.app |
+| API docs | https://baton-api-haqs.onrender.com/docs |
 | Repository | https://github.com/shravanisy2006/Baton |
 
 ## Try it

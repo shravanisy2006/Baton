@@ -1,7 +1,7 @@
 # Round 2 submission notes — Baton (Team Pixels)
 
-- **Deployed app:** `<Vercel URL>` (fill in after deploying)
-- **API and interactive docs:** `<Render URL>/docs`
+- **Deployed app:** https://baton-weld.vercel.app
+- **API and interactive docs:** https://baton-api-haqs.onrender.com/docs
 - **Repository:** `https://github.com/shravanisy2006/Baton`
 
 ## Completed features
