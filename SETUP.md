@@ -1,4 +1,6 @@
-# Setup — run Baton on your computer, then deploy it
+# Setup — run Baton on your computer
+
+To put it online, see [DEPLOY.md](DEPLOY.md).
 
 Written for Windows (PowerShell). Every command is typed in a terminal: in VS Code, use **Terminal → New Terminal**.
 
@@ -6,7 +8,7 @@ Written for Windows (PowerShell). Every command is typed in a terminal: in VS Co
 
 | Tool | Where | Note |
 | --- | --- | --- |
-| Python 3.12, 3.13 or 3.14 | python.org/downloads | In the installer, **tick "Add python.exe to PATH"** |
+| Python 3.12 – 3.15 | python.org/downloads | In the installer, **tick "Add python.exe to PATH"** |
 | Node.js 20 LTS | nodejs.org | Default options |
 | Git | git-scm.com | Default options |
 
@@ -50,11 +52,11 @@ copy .env.example .env.local
 npm run dev
 ```
 
-Open http://localhost:5173 and click **Open the live demo**. The first demo run calls Gemini (about 20–40 seconds). Later demos reuse the cached answers and open instantly.
+Open http://localhost:5173. Click **Try it with your project** to hand over your own files, or **See how it works → Open the example** for the worked example. The first analysis calls Gemini (about 20–60 seconds). Running it again reuses the saved answers and is instant.
 
 ## 4. Put it on GitHub
 
-1. On github.com → **New repository** → name `baton` → **Public** → *Create* (don't add a README).
+1. On github.com → **New repository** → name `Baton` → **Public** → *Create* (don't add a README).
 2. In a terminal:
 
 ```powershell
@@ -63,34 +65,15 @@ git init
 git add .
 git commit -m "Baton Round 2 MVP"
 git branch -M main
-git remote add origin https://github.com/shravanisy2006/baton.git
+git remote add origin https://github.com/shravanisy2006/Baton.git
 git push -u origin main
 ```
 
 Before pushing, run `git status` and make sure no `.env` file is listed.
 
-## 5. Deploy the backend on Render
+## 5. Deploy
 
-1. render.com → sign in with GitHub → **New → Blueprint** → pick the `baton` repo. Render reads `render.yaml`.
-2. When asked, fill in:
-   - `DATABASE_URL`: your Supabase Session pooler URI
-   - `GEMINI_API_KEY`: your key
-   - `CORS_ORIGINS`: leave empty for now
-   - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`: optional
-3. Wait for *Live*, then open `https://<your-service>.onrender.com/health`. It should show `"ok": true` and `"configured": true`.
-
-## 6. Deploy the frontend on Vercel
-
-1. vercel.com → **Add New → Project** → import the `baton` repo.
-2. **Root Directory: `frontend`**. Framework: Vite (detected automatically).
-3. Environment variable: `VITE_API_URL` = your Render URL (no trailing slash).
-4. Deploy. Then add your Vercel URL to `CORS_ORIGINS` on Render and redeploy. Any `*.vercel.app` URL is already allowed.
-
-## 7. Before judging
-
-- Open the Vercel URL in an **incognito window** and click through the whole demo once. This also caches the demo's AI answers in Supabase.
-- Render's free plan sleeps after about 15 minutes of no traffic. Open the site 1–2 minutes before you present.
-- Optional: run `.venv\Scripts\python scripts\export_demo_cache.py` locally after a demo run and commit `backend/seed/eventapp/llm_cache.json`. A brand-new database can then serve the demo without any Gemini calls.
+Follow [DEPLOY.md](DEPLOY.md): Supabase (database), then Render (backend), then Vercel (website).
 
 ## Troubleshooting
 
