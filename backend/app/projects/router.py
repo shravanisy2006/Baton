@@ -13,9 +13,18 @@ from ..models import (LABEL_BY_NAME, LABELS, ROLES, Claim, Conflict, EvidenceUni
 router = APIRouter(tags=["projects"])
 
 
+class PersonIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    handle: str | None = Field(default=None, max_length=120)
+    access_level: str = "Leads"
+
+
 class ProjectIn(BaseModel):
     name: str = Field(min_length=2, max_length=160)
     description: str = Field(default="", max_length=2000)
+    your_name: str | None = Field(default=None, max_length=120)
+    departing: PersonIn | None = None
+    incoming: PersonIn | None = None
 
 
 def _job_out(j: Job | None) -> dict | None:
@@ -47,13 +56,54 @@ def list_projects(s=Depends(current_session), db: Session = Depends(get_db)):
 def create_project(body: ProjectIn, s=Depends(current_session), db: Session = Depends(get_db)):
     if not s.user:
         raise HTTPException(401, "Start a workspace first.")
+    levels = {}
+    for key in ("departing", "incoming"):
+        person = getattr(body, key)
+        if person:
+            levels[key] = LABEL_BY_NAME.get(person.access_level.lower())
+            if not levels[key]:
+                raise HTTPException(422, "Access level must be Team, Leads or Restricted.")
+    if body.your_name and body.your_name.strip() and s.user.name == "You":
+        s.user.name = body.your_name.strip()
     p = Project(account_id=s.account.id, name=body.name.strip(), description=body.description.strip())
     db.add(p)
     db.flush()
     db.add(Membership(project_id=p.id, user_id=s.user.id, role="admin", access_level=3))
     audit(db, p.id, s.user, "project.created", "project", p.id, name=p.name)
+    for key in ("departing", "incoming"):
+        person = getattr(body, key)
+        if not person or not person.name.strip():
+            continue
+        u = User(account_id=s.account.id, name=person.name.strip(), handle=(person.handle or "").strip() or None)
+        db.add(u)
+        db.flush()
+        db.add(Membership(project_id=p.id, user_id=u.id, role=key, access_level=levels[key]))
+        setattr(p, f"{key}_user_id", u.id)
+        audit(db, p.id, s.user, "member.added", "user", u.id, name=u.name, role=key,
+              access_level=LABELS[levels[key]])
     db.commit()
     return {"id": p.id, "name": p.name}
+
+
+@router.get("/samples.zip", tags=["system"])
+def sample_files():
+    """The synthetic EventApp files, so anyone can try the upload flow without their own project data."""
+    import io
+    import zipfile
+
+    from fastapi.responses import Response
+
+    from ..demo import SEED_DIR, SEED_FILES
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for filename, label in SEED_FILES:
+            z.write(SEED_DIR / filename, filename)
+        z.writestr("LABELS.txt", "Suggested access label for each file when you upload it:\n" + "\n".join(
+            f"{f}: {LABELS[label]}" for f, label in SEED_FILES) + "\n\nSuggested people: Riya Sharma (username riya-dev) "
+            "is leaving; Karan Mehta (username karan-m) is taking over. All content is synthetic.\n")
+    return Response(buf.getvalue(), media_type="application/zip",
+                    headers={"Content-Disposition": 'attachment; filename="baton-sample-project.zip"'})
 
 
 @router.get("/projects/{project_id}")

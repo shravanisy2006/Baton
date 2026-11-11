@@ -173,6 +173,8 @@ function nextStep(role: string, o: ReturnType<typeof useProject>["overview"], ba
       ? { text: `There are ${o.counts.open_gaps} questions only you can answer before you leave.`, to: `${base}/gaps`, cta: "Answer questions" }
       : { text: "No open questions for you right now." };
   }
+  if (!o.project.departing || !o.project.incoming)
+    return { text: "Add who is leaving and who is taking over (People, at the bottom of this page)." };
   if (!o.counts.sources) return { text: "Add the project's sources.", to: `${base}/sources`, cta: "Add sources" };
   if (!job) return { text: "Run the analysis to extract and verify claims (button above)." };
   if (job.status === "queued" || job.status === "running") return { text: "Analysis is running. This page updates automatically." };

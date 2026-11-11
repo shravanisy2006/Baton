@@ -87,10 +87,10 @@ export default function Landing() {
             Open the live demo <ArrowRight className="h-4 w-4" />
           </Button>
           <Button variant="secondary" onClick={guest} loading={busy === "guest"} disabled={!!busy} className="px-5 py-2.5 text-base">
-            Start with your own files
+            Hand over your own project
           </Button>
         </div>
-        <p className="mt-3 text-xs text-slate-500">No sign-up. The demo is a private copy of a synthetic project, just for you.</p>
+        <p className="mt-3 text-xs text-slate-500">No sign-up. The demo is a ready-made synthetic project; or bring your own files and name who is leaving and who is joining.</p>
         {server === "slow" && (
           <p className="mt-3 text-xs text-amber-700">The server is waking up (free hosting sleeps when idle). This can take up to a minute.</p>
         )}
@@ -133,7 +133,7 @@ export default function Landing() {
           </p>
           <ul className="mt-5 space-y-2 text-sm text-slate-700">
             {[
-              "Quote check in plain code — exact match, then fuzzy match ≥ 90%",
+              "Quote check in plain code — the quote must appear word for word; altered quotes are rejected",
               "Separate support check: does the quote actually back the claim?",
               "Conflicting sources shown side by side until a person decides",
               "Missing owners and reasons become questions for the person leaving",

@@ -1,6 +1,7 @@
-import { FileUp, Github, Lock, Upload } from "lucide-react";
+import { FileUp, Github, Lock, Play, Upload } from "lucide-react";
 import { useRef, useState } from "react";
-import { api } from "../lib/api";
+import { useNavigate } from "react-router-dom";
+import { api, API_URL } from "../lib/api";
 import { useApi } from "../lib/hooks";
 import { useProject } from "../lib/session";
 import type { Source } from "../lib/types";
@@ -27,6 +28,7 @@ export default function SourcesPage() {
         title="Sources"
         subtitle="Authorised project material. Every source carries an access label, and everything taken from it inherits that label."
       />
+      {canManage && !o.project.is_demo && !o.counts.claims && <GettingStarted hasSources={!!data?.sources.length} />}
       {canManage && <UploadPanel onDone={() => (reload(true), reloadOverview())} />}
       {loading && <Spinner />}
       {error && <ErrorBox message={error.message} onRetry={reload} />}
@@ -239,5 +241,62 @@ function UploadPanel({ onDone }: { onDone: () => void }) {
         )}
       </Card>
     </div>
+  );
+}
+
+function GettingStarted({ hasSources }: { hasSources: boolean }) {
+  const { overview: o, reload } = useProject();
+  const nav = useNavigate();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function analyse() {
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.post(`/projects/${o.project.id}/analyse`);
+      await reload();
+      nav(`/p/${o.project.id}`);
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="mb-5 p-5">
+      <h2 className="font-semibold text-slate-900">Set up the handover</h2>
+      <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-600">
+        <li>
+          Upload the project's files: meeting notes, task lists (CSV), design docs, PDFs, chat exports (WhatsApp .txt, Slack or
+          Discord .json), or import a GitHub repo.
+        </li>
+        <li>
+          Give each upload an access label. <b>Team</b>: everyone. <b>Leads</b>: leads and above. <b>Restricted</b>: reviewer only.
+          {o.project.incoming && <> {o.project.incoming} will only ever see what their level allows.</>}
+        </li>
+        <li>Run the analysis. Baton extracts claims, checks every quote, and flags gaps and conflicts for you to review.</li>
+      </ol>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <Button onClick={analyse} loading={busy} disabled={!hasSources}>
+          <Play className="h-4 w-4" /> Run analysis
+        </Button>
+        {!hasSources && (
+          <span className="text-xs text-slate-500">
+            Upload at least one file first. No files handy?{" "}
+            <a className="text-brand-600 hover:underline" href={`${API_URL}/samples.zip`}>
+              Download a sample project
+            </a>{" "}
+            (it includes a note on which label to give each file).
+          </span>
+        )}
+      </div>
+      {err && (
+        <div className="mt-3">
+          <ErrorBox message={err} />
+        </div>
+      )}
+    </Card>
   );
 }

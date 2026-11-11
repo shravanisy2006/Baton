@@ -326,3 +326,49 @@ def test_chat_and_json_imports(client):
     issue = next(e for e in ev if e["kind"] == "github_issue")
     assert "[reopened]" in issue["text"] and issue["author"] == "anika" and issue["date"] == "2026-10-02 10:00"
     assert any(e["kind"] == "chat_message" and e["author"] == "priya" for e in ev)
+
+
+# ---------- own project: a judge brings their own files and people ----------
+
+def test_own_project_from_scratch(client):
+    import zipfile
+
+    tok = client.post("/auth/guest").json()["token"]
+    body = {"name": "Judge project", "your_name": "Dr. Mehra",
+            "departing": {"name": "Riya Sharma", "handle": "riya-dev", "access_level": "Leads"},
+            "incoming": {"name": "Karan Mehta", "handle": "karan-m", "access_level": "Leads"}}
+    pid = client.post("/projects", json=body, headers=auth(tok)).json()["id"]
+    ov = client.get(f"/projects/{pid}", headers=auth(tok)).json()
+    assert ov["project"]["departing"] == "Riya Sharma" and ov["project"]["incoming"] == "Karan Mehta"
+    assert ov["me"]["name"] == "Dr. Mehra" and ov["me"]["role"] == "admin"
+
+    # Upload the downloadable sample pack, file by file, with the suggested labels.
+    z = zipfile.ZipFile(io.BytesIO(client.get("/samples.zip").content))
+    assert "LABELS.txt" in z.namelist()
+    from app.demo import SEED_FILES
+    from app.models import LABELS
+    for filename, label in SEED_FILES:
+        r = client.post(f"/projects/{pid}/sources/upload", files=[("files", (filename, z.read(filename)))],
+                        data={"access_label": LABELS[label]}, headers=auth(tok))
+        assert r.json()["results"][0]["ok"], r.text
+    assert client.post(f"/projects/{pid}/analyse", headers=auth(tok)).status_code == 200
+    ov = client.get(f"/projects/{pid}", headers=auth(tok)).json()
+    assert ov["latest_job"]["status"] == "done" and ov["counts"]["claims"] >= 10
+
+    # Resolve conflicts, approve what can be approved, and share the handover.
+    for k in client.get(f"/projects/{pid}/conflicts", headers=auth(tok)).json()["conflicts"]:
+        client.post(f"/conflicts/{k['id']}/resolve", json={"winner_claim_id": k["side_b"][0]["id"], "note": "newer"},
+                    headers=auth(tok))
+    for c in client.get(f"/projects/{pid}/claims", headers=auth(tok)).json()["claims"]:
+        if c["review_state"] == "pending" and c["confidence"] in ("verified", "corroborated", "weak"):
+            client.post(f"/claims/{c['id']}/review", json={"action": "approve"}, headers=auth(tok))
+    v = client.post(f"/projects/{pid}/handover/generate", headers=auth(tok)).json()
+    client.post(f"/handover/{v['id']}/approve", headers=auth(tok))
+
+    people = {p["name"]: p["id"] for p in client.get("/auth/me", headers=auth(tok)).json()["people"]}
+    karan = client.post("/auth/act-as", json={"user_id": people["Karan Mehta"]}, headers=auth(tok)).json()["token"]
+    h = client.get(f"/projects/{pid}/handover", headers=auth(karan)).json()
+    sections = {s["key"]: s for s in h["content"]["sections"]}
+    assert h["content"]["departing"] == "Riya Sharma"
+    assert any(i["claim_id"] for s in sections.values() for i in s["items"])
+    assert sections["contacts"]["hidden_count"] >= 1  # Restricted sponsor notes stay hidden from Leads
