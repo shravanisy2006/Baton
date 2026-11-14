@@ -21,19 +21,42 @@ export default function Landing() {
   const [busy, setBusy] = useState<"demo" | "guest" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [server, setServer] = useState<"checking" | "up" | "slow" | "down">("checking");
+  const [waited, setWaited] = useState(0);
+  const [attempt, setAttempt] = useState(0);
 
+  // The free server sleeps when idle and needs up to a minute to wake. Keep knocking quietly for
+  // up to 3 minutes, showing a friendly "waking up" note, before saying it's unreachable.
   useEffect(() => {
-    let done = false;
-    const slow = setTimeout(() => !done && setServer("slow"), 2500);
-    fetch(`${API_URL}/health`)
-      .then((r) => setServer(r.ok ? "up" : "down"))
-      .catch(() => setServer("down"))
-      .finally(() => {
-        done = true;
-        clearTimeout(slow);
-      });
-    return () => clearTimeout(slow);
-  }, []);
+    let stopped = false;
+    const started = Date.now();
+    const slow = setTimeout(() => !stopped && setServer((s) => (s === "checking" ? "slow" : s)), 2500);
+    const tick = setInterval(() => !stopped && setWaited(Math.round((Date.now() - started) / 1000)), 1000);
+    async function knock() {
+      while (!stopped && Date.now() - started < 180_000) {
+        try {
+          const ctrl = new AbortController();
+          const t = setTimeout(() => ctrl.abort(), 20_000);
+          const r = await fetch(`${API_URL}/health`, { signal: ctrl.signal });
+          clearTimeout(t);
+          if (r.ok) {
+            if (!stopped) setServer("up");
+            return;
+          }
+        } catch {
+          /* still asleep or restarting: try again */
+        }
+        if (!stopped) setServer("slow");
+        await new Promise((res) => setTimeout(res, 4000));
+      }
+      if (!stopped) setServer("down");
+    }
+    knock();
+    return () => {
+      stopped = true;
+      clearTimeout(slow);
+      clearInterval(tick);
+    };
+  }, [attempt]);
 
   async function demo() {
     setBusy("demo");
@@ -94,10 +117,18 @@ export default function Landing() {
           you step by step. Just looking? The worked example needs no account.
         </p>
         {server === "slow" && (
-          <p className="mt-3 text-xs text-amber-700">The server is waking up (free hosting sleeps when idle). This can take up to a minute.</p>
+          <p className="mt-3 text-xs text-amber-700">
+            Waking up the server ({waited}s)… Baton runs on free hosting that sleeps when nobody has used it for a while. This
+            usually takes under a minute, and the page carries on by itself; you can start clicking now.
+          </p>
         )}
         {server === "down" && (
-          <p className="mt-3 text-xs text-rose-700">Can't reach the Baton server right now. Please try again in a moment.</p>
+          <p className="mt-3 text-xs text-rose-700">
+            The server is taking longer than usual to wake up.{" "}
+            <button className="font-medium underline" onClick={() => (setServer("checking"), setWaited(0), setAttempt((a) => a + 1))}>
+              Try again
+            </button>
+          </p>
         )}
         {error && (
           <div className="mx-auto mt-4 max-w-md text-left">

@@ -44,7 +44,7 @@ async function request<T>(method: string, path: string, body?: unknown, isForm =
       body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError(0, "Can't reach the Baton server. It may be waking up — try again in a few seconds.");
+    throw new ApiError(0, "Can't reach the Baton server. The free server may be waking up or updating (up to a minute) — please try again shortly.");
   }
   if (!res.ok) {
     let msg = `Request failed (${res.status})`;

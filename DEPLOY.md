@@ -103,7 +103,7 @@ If you change `VITE_API_URL` later, redeploy: **Deployments → ⋯ → Redeploy
 
 ---
 
-## Step 5: Keep the server awake (recommended)
+## Step 5: Keep the server awake (do this before judging)
 
 Render's free server sleeps after 15 minutes without visitors. The first visit after that takes about 50 seconds.
 To stop judges waiting:

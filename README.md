@@ -16,6 +16,11 @@ Team Pixels (JSPM's RSCOE, Pune) · We Code Coders hackathon, Round 3 (final).
 | API docs | https://baton-api-haqs.onrender.com/docs |
 | Repository | https://github.com/shravanisy2006/Baton |
 
+> **First visit slow? Please wait up to a minute.** Baton runs on free hosting (Render), which puts the server to sleep
+> after about 15 minutes without visitors. The home page shows "Waking up the server…" and carries on by itself once it
+> is awake; after that everything responds normally. An uptime monitor pings the server every 5 minutes to keep it awake.
+> Analysing your own files (30 s – 2 min) and Ask Baton (a few seconds) also wait on the Gemini AI, and say so if it is busy.
+
 ---
 
 ## Try it (for judges)
