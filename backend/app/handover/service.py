@@ -49,6 +49,14 @@ def _item(c: Claim) -> dict:
     }
 
 
+def fingerprint(c: Claim) -> str:
+    """Identifies an approved claim and its reviewed wording, to tell when a handover is out of date."""
+    import hashlib
+
+    body = "|".join(str(x or "") for x in (c.statement, c.status, c.owner, c.rationale, c.review_state))
+    return f"{c.id}:{hashlib.sha1(body.encode()).hexdigest()[:10]}"
+
+
 def build_snapshot(db: Session, project: Project) -> dict:
     departing = db.get(User, project.departing_user_id) if project.departing_user_id else None
     incoming = db.get(User, project.incoming_user_id) if project.incoming_user_id else None
@@ -111,6 +119,7 @@ def build_snapshot(db: Session, project: Project) -> dict:
             "access_level": g.access_label, "evidence": [], "gap_kind": g.kind,
         })
     return {
+        "approved_claim_ids": sorted(fingerprint(c) for c in claims),
         "project": project.name,
         "departing": departing.name if departing else None,
         "incoming": incoming.name if incoming else None,
@@ -139,3 +148,58 @@ def filter_for_level(snapshot: dict, level: int) -> dict:
     out["sections"] = out_sections
     out["hidden_count"] = hidden_total
     return out
+
+
+def _key(item: dict) -> str:
+    return item.get("claim_id") or f"gap:{item.get('text', '')}"
+
+
+def _summary(item: dict) -> str:
+    return item.get("action") or item.get("text", "")
+
+
+def diff_snapshots(old: dict | None, new: dict) -> dict:
+    """What changed between the last approved handover and this draft, section by section.
+    Also tags each item in `new` with change = "added" | "changed" so the page can badge it."""
+    if not old:
+        return {}
+    old_secs = {sec["key"]: {_key(i): i for i in sec["items"]} for sec in old.get("sections", [])}
+    sections, total = {}, 0
+    for sec in new.get("sections", []):
+        before = old_secs.get(sec["key"], {})
+        now_keys = set()
+        added, changed = [], []
+        for item in sec["items"]:
+            k = _key(item)
+            now_keys.add(k)
+            prev = before.get(k)
+            if prev is None:
+                item["change"] = "added"
+                added.append({"text": _summary(item), "access_level": item.get("access_level", 1)})
+            elif any(prev.get(f) != item.get(f) for f in ("text", "status", "owner", "confidence", "rationale")):
+                item["change"] = "changed"
+                changed.append({"before": _summary(prev), "after": _summary(item),
+                                "access_level": max(prev.get("access_level", 1), item.get("access_level", 1))})
+        removed = [{"text": _summary(i), "access_level": i.get("access_level", 1)}
+                   for k, i in before.items() if k not in now_keys]
+        if added or changed or removed:
+            sections[sec["key"]] = {"added": added, "changed": changed, "removed": removed}
+            total += len(added) + len(changed) + len(removed)
+    return {"sections": sections, "total": total}
+
+
+def filter_diff(diff: dict, level: int) -> dict:
+    """The diff obeys the same access rules as the handover: hidden lines are counted, never shown."""
+    if not diff:
+        return {}
+    out, total, hidden = {}, 0, 0
+    for key, parts in diff.get("sections", {}).items():
+        sec = {}
+        for part, rows in parts.items():
+            vis = [r for r in rows if r.get("access_level", 1) <= level]
+            hidden += len(rows) - len(vis)
+            sec[part] = vis
+            total += len(vis)
+        if any(sec.values()):
+            out[key] = sec
+    return {**diff, "sections": out, "total": total, "hidden": hidden}

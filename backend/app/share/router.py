@@ -8,8 +8,8 @@ from ..audit.service import log as audit
 from ..auth.security import current_session, require_member
 from ..db import get_db
 from ..handover.router import version_out
-from ..handover.service import SECTIONS, filter_for_level
-from ..models import Acknowledgement, HandoverVersion
+from ..handover.service import SECTIONS, filter_diff, filter_for_level
+from ..models import Acknowledgement, Claim, HandoverVersion
 
 router = APIRouter(tags=["share"])
 SECTION_KEYS = {k for k, _ in SECTIONS}
@@ -32,7 +32,26 @@ def view_handover(project_id: str, s=Depends(current_session), db: Session = Dep
     if m.role == "incoming":
         audit(db, project_id, m.user, "handover.viewed", "handover", v.id, version=v.version)
         db.commit()
-    return {**version_out(v), "content": filter_for_level(v.snapshot, m.level),
+    content = filter_for_level(v.snapshot, m.level)
+    # Living handover: flag lines of this version that newer evidence has since put in doubt.
+    changed = {c.id: (c.changed_note, c.review_state) for c in db.query(Claim).filter(
+        Claim.project_id == project_id,
+        (Claim.changed_note.isnot(None)) | (Claim.review_state.in_(("superseded", "rejected"))))}
+    flagged = 0
+    for sec in content["sections"]:
+        for item in sec["items"]:
+            hit = changed.get(item.get("claim_id") or "")
+            if hit:
+                note, state = hit
+                item["changed_since_approval"] = note or (
+                    "Replaced by newer evidence; the reviewer will issue an updated handover." if state == "superseded"
+                    else "Withdrawn by the reviewer after approval.")
+                flagged += 1
+    pending = (db.query(HandoverVersion).filter_by(project_id=project_id, status="draft")
+               .filter(HandoverVersion.version > v.version).first())
+    return {**version_out(v), "content": content,
+            "diff": filter_diff(v.diff or {}, m.level), "changed_since_approval": flagged,
+            "update_in_review": bool(pending) or (flagged > 0 and v.status == "approved"),
             "viewer": {"name": m.user.name, "role": m.role, "access_level": m.level},
             "acknowledged": sorted(acks)}
 

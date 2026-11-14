@@ -9,6 +9,7 @@ _tmp = tempfile.mkdtemp(prefix="baton-test-")
 os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{_tmp}/test.db"
 os.environ["LOCAL_STORAGE_DIR"] = f"{_tmp}/storage"
 os.environ["GEMINI_API_KEY"] = ""
+os.environ["BATON_SKIP_DEMO_CACHE"] = "1"  # tests use the scripted AI, not the saved real answers
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytest  # noqa: E402
@@ -77,6 +78,12 @@ def fake_extract(prompt: str) -> dict:
     add("I'll turn the flag on on 20 November after testing checkout", type="task", subject="payments flag",
         statement="Karan will turn PAYMENTS_ENABLED on on 20 November after testing checkout.",
         status="todo", owner="Karan")
+    # Round 3 (living handover): newer evidence uploaded after the handover was approved.
+    add("The attendee Excel export fix is done and deployed", type="task", subject="excel export",
+        statement="The attendee Excel export fix is done and deployed; it now works above 500 rows.",
+        status="done", owner="Karan")
+    add("Venue Wi-Fi for check-in is provided by the college IT desk", type="dependency", subject="venue wifi",
+        statement="Check-in at the venue depends on Wi-Fi from the college IT desk.")
     # A quote with altered words: must be rejected by the word-for-word check.
     meeting2 = _find(u, "Riya owns the registration API")
     if meeting2:
@@ -113,7 +120,28 @@ def fake_supersede(prompt: str) -> dict:
     return {"verdicts": verdicts}
 
 
+def fake_ask(prompt: str) -> dict:
+    """Scripted Ask Baton: answers only when the matching evidence is in the prompt."""
+    question = prompt.split("\n", 1)[0].lower()
+    u = _units(prompt.split("Evidence:", 1)[-1].strip() + "\n")
+    if "invent" in question:
+        code = next(iter(u), "E-1")
+        return {"answerable": True, "answer": "Made up.", "citations": [{"evidence_id": code, "quote": "words that are not there at all"}]}
+    for key, phrase, answer in (
+            ("payments", "keep online payments disabled with the PAYMENTS_ENABLED flag",
+             "Online payments are kept off with the PAYMENTS_ENABLED flag until the sponsor MoU is signed."),
+            ("sponsor contact", "Our sponsor contact for the MoU is Arjun Rao", "Arjun Rao is the sponsor contact for the MoU."),
+            ("parking", "Visitor parking is behind the library", "Visitor parking is behind the library.")):
+        if key in question:
+            code = _find(u, phrase)
+            if code:
+                return {"answerable": True, "answer": answer, "citations": [{"evidence_id": code, "quote": phrase}]}
+    return {"answerable": False, "answer": "", "citations": []}
+
+
 def fake_llm(system: str, prompt: str, schema) -> str:
+    if schema.__name__ == "AskResult":
+        return json.dumps(fake_ask(prompt))
     if schema.__name__ == "ExtractionResult":
         return json.dumps(fake_extract(prompt))
     if schema.__name__ == "SupersedeResult":
@@ -136,6 +164,17 @@ def client():
 
 def auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
+
+
+_n = [0]
+
+
+def signup(client, name: str = "Test Reviewer", email: str | None = None, password: str = "correct-horse-9") -> str:
+    _n[0] += 1
+    email = email or f"user{_n[0]}-{id(client)}@example.com"
+    r = client.post("/auth/signup", json={"name": name, "email": email, "password": password})
+    assert r.status_code == 200, r.text
+    return r.json()["token"]
 
 
 @pytest.fixture()

@@ -8,8 +8,8 @@ def log(db: Session, project_id: str, actor: User | None, action: str,
     """Append one audit event. Callers commit with their own transaction."""
     db.add(AuditEvent(
         project_id=project_id,
-        actor_id=actor.id if actor else None,
-        actor_name=actor.name if actor else "Baton",
+        actor_id=getattr(actor, "_audit_id", None) or (actor.id if actor else None),
+        actor_name=getattr(actor, "_audit_name", None) or (actor.name if actor else "Baton"),
         action=action,
         target_type=target_type,
         target_id=target_id,

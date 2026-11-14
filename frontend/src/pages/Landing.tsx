@@ -1,8 +1,9 @@
-import { ArrowRight, CheckCircle2, ClipboardCheck, FileSearch, Lock, Plug, Send, ShieldCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, ClipboardCheck, FileSearch, Lock, MessageCircleQuestion, Plug, RefreshCw, Send, ShieldCheck, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_URL } from "../lib/api";
 import { useSession } from "../lib/session";
+import AccountMenu from "../components/AccountMenu";
 import { Button, ErrorBox } from "../components/ui";
 import Logo from "../components/Logo";
 
@@ -15,7 +16,7 @@ const STEPS = [
 ];
 
 export default function Landing() {
-  const { me, startDemo, startGuest } = useSession();
+  const { me, startDemo } = useSession();
   const nav = useNavigate();
   const [busy, setBusy] = useState<"demo" | "guest" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -47,28 +48,22 @@ export default function Landing() {
     }
   }
 
-  async function guest() {
-    setBusy("guest");
-    setError(null);
-    try {
-      await startGuest();
-      nav("/projects");
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(null);
-    }
+  function guest() {
+    nav(me?.registered ? "/projects" : "/signin?next=/projects");
   }
 
   return (
     <div className="min-h-screen bg-white">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
         <Logo />
-        {me?.projects.length ? (
-          <Button variant="secondary" onClick={() => nav("/projects")}>
-            My workspaces
-          </Button>
-        ) : null}
+        <div className="flex items-center gap-3">
+          {me?.registered || me?.projects.length ? (
+            <Button variant="secondary" onClick={() => nav("/projects")}>
+              My projects
+            </Button>
+          ) : null}
+          <AccountMenu />
+        </div>
       </header>
 
       <section className="mx-auto max-w-6xl px-5 pb-16 pt-10 text-center sm:pt-16">
@@ -83,7 +78,7 @@ export default function Landing() {
           is shown honestly, and the new member only sees what they're allowed to see.
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Button onClick={guest} loading={busy === "guest"} disabled={!!busy} className="px-5 py-2.5 text-base">
+          <Button onClick={guest} disabled={!!busy} className="px-5 py-2.5 text-base">
             Try it with your project <ArrowRight className="h-4 w-4" />
           </Button>
           <Button
@@ -95,7 +90,8 @@ export default function Landing() {
           </Button>
         </div>
         <p className="mt-3 text-xs text-slate-500">
-          No sign-up. Name who is leaving and who is taking over, upload the project's files, and Baton guides you step by step.
+          Free account. Name who is leaving and who is taking over, invite them, upload the project's files, and Baton guides
+          you step by step. Just looking? The worked example needs no account.
         </p>
         {server === "slow" && (
           <p className="mt-3 text-xs text-amber-700">The server is waking up (free hosting sleeps when idle). This can take up to a minute.</p>
@@ -124,6 +120,20 @@ export default function Landing() {
                 </div>
                 <h3 className="mt-3 font-semibold text-slate-900">{s.title}</h3>
                 <p className="mt-1 text-sm text-slate-600">{s.text}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            {[
+              { icon: RefreshCw, title: "Stays true after approval", text: "New uploads or a GitHub re-sync are read on their own. Approved lines that newer evidence contradicts are flagged, and version 2 shows exactly what changed." },
+              { icon: MessageCircleQuestion, title: "Ask Baton", text: "The new member asks plain questions. Answers quote only evidence they may see, every quote checked word for word. If the files don't say, the leaver is asked." },
+              { icon: Users, title: "Everyone signs in", text: "Invite the person leaving and the person joining with one-time links. Each signs in with their own account; access can be removed at any time." },
+            ].map((f) => (
+              <div key={f.title} className="rounded-xl border border-slate-200 bg-white p-5">
+                <f.icon className="h-5 w-5 text-brand-600" />
+                <div className="mt-2 font-semibold text-slate-900">{f.title}</div>
+                <p className="mt-1 text-sm text-slate-600">{f.text}</p>
               </div>
             ))}
           </div>

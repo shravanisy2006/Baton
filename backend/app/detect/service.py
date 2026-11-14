@@ -28,9 +28,11 @@ def _names_match(a: str, b: str) -> bool:
     return a == b or a in b or b in a or fuzz.ratio(a, b) >= 85
 
 
-def dedupe(db: Session, claims: list[Claim]) -> list[Claim]:
-    """Merge claims stating the same fact so multiple sources corroborate one claim."""
-    kept: list[Claim] = []
+def dedupe(db: Session, claims: list[Claim], existing: list[Claim] | None = None) -> list[Claim]:
+    """Merge claims stating the same fact so multiple sources corroborate one claim. With `existing`
+    (an update run), a new claim that restates an existing one adds its quote to that claim instead."""
+    existing = list(existing or [])
+    kept: list[Claim] = list(existing)
     for c in claims:
         twin = next((k for k in kept if k.type == c.type and same_subject(k.subject, c.subject)
                      and (k.status or "") == (c.status or "")
@@ -49,7 +51,7 @@ def dedupe(db: Session, claims: list[Claim]) -> list[Claim]:
         twin.access_label = max(twin.access_label, c.access_label)
         db.delete(c)
     db.flush()
-    return kept
+    return [k for k in kept if k not in existing]
 
 
 def _source_desc(claim: Claim) -> str:
@@ -105,7 +107,10 @@ def _make(project_id: str, kind: str, side_a: list[Claim], side_b: list[Claim], 
     )
 
 
-def detect_conflicts(db: Session, project_id: str, claims: list[Claim]) -> list[Conflict]:
+def detect_conflicts(db: Session, project_id: str, claims: list[Claim],
+                     only_with: set[str] | None = None) -> list[Conflict]:
+    """Status and owner conflicts. With `only_with` (an update run) only disagreements that involve at least
+    one of those (new) claims are reported; older ones were already raised before."""
     usable = [c for c in claims if valid_citations(c) and c.support in ("supports", "partial")]
     found: list[Conflict] = []
 
@@ -155,6 +160,8 @@ def detect_conflicts(db: Session, project_id: str, claims: list[Claim]) -> list[
             found.append(_make(project_id, "owner", a, b,
                                f"Different owners for '{g[0].subject}': "
                                + "; ".join(f"{cl[0].owner} ({_side_text(cl)})" for cl in clusters) + "."))
+    if only_with is not None:
+        found = [k for k in found if set(k.side_a + k.side_b) & only_with]
     for c in found:
         db.add(c)
     db.flush()
@@ -179,7 +186,8 @@ compatible: both can be true at the same time (one adds detail, implements or re
 unclear: the quotes don't let you tell. Judge only from the quotes given. Give a short reason."""
 
 
-def detect_supersessions(db: Session, project_id: str, claims: list[Claim]) -> tuple[list[Conflict], list[str]]:
+def detect_supersessions(db: Session, project_id: str, claims: list[Claim],
+                         only_with: set[str] | None = None) -> tuple[list[Conflict], list[str]]:
     """Timeline check: flag an older decision that a newer decision or instruction on the same topic may
     have replaced (e.g. "keep payments off until the MoU" -> later "turn payments back on on 20 Nov")."""
     dated = [c for c in claims if valid_citations(c) and c.support in ("supports", "partial") and claim_date(c)]
@@ -195,6 +203,8 @@ def detect_supersessions(db: Session, project_id: str, claims: list[Claim]) -> t
                 continue
             if fuzz.token_set_ratio(older.statement, newer.statement) >= 80:
                 continue  # same decision restated
+            if only_with is not None and older.id not in only_with and newer.id not in only_with:
+                continue
             if (older.id, newer.id) not in seen:
                 seen.add((older.id, newer.id))
                 pairs.append((older, newer))
@@ -261,7 +271,10 @@ def detect_gaps(db: Session, project_id: str, claims: list[Claim], conflicts: li
         gaps.append(Gap(project_id=project_id, claim_id=None, conflict_id=k.id, kind="conflict",
                         access_label=k.access_label,
                         question=f"Sources disagree about \"{subject}\". {k.explanation} {ask}"))
+    asked_sources = {g.source_id for g in db.query(Gap).filter_by(project_id=project_id, kind="unreadable_source")}
     for s in db.query(Source).filter_by(project_id=project_id).filter(Source.status.in_(("unreadable", "failed"))):
+        if s.id in asked_sources:
+            continue
         gaps.append(Gap(project_id=project_id, source_id=s.id, kind="unreadable_source", access_label=s.access_label,
                         question=f"\"{s.filename}\" could not be read. Is there anything in it the new member must know?"))
     for g in gaps:

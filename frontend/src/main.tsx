@@ -15,6 +15,9 @@ import ReviewPage from "./pages/Review";
 import HandoverPage from "./pages/Handover";
 import AuditPage from "./pages/Audit";
 import NotFound from "./pages/NotFound";
+import SignInPage from "./pages/SignIn";
+import InvitePage from "./pages/Invite";
+import AskPage from "./pages/Ask";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -23,6 +26,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/projects" element={<Projects />} />
+          <Route path="/signin" element={<SignInPage />} />
+          <Route path="/invite/:token" element={<InvitePage />} />
           <Route path="/p/:pid" element={<Layout />}>
             <Route index element={<OverviewPage />} />
             <Route path="sources" element={<SourcesPage />} />
@@ -31,6 +36,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="gaps" element={<GapsPage />} />
             <Route path="review" element={<ReviewPage />} />
             <Route path="handover" element={<HandoverPage />} />
+            <Route path="ask" element={<AskPage />} />
             <Route path="audit" element={<AuditPage />} />
           </Route>
           <Route path="*" element={<NotFound />} />

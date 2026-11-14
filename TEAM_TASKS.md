@@ -1,20 +1,22 @@
-# Team tasks — Round 2
+# Team tasks — Rounds 2 and 3
 
-**Builder:** Shravani Yalagatti (Team Lead — AI & System Architecture). Round 2 was built solo, so every module below is
+**Builder:** Shravani Yalagatti (Team Lead — AI & System Architecture). Rounds 2 and 3 were built solo, so every module below is
 owned by Shravani. The module boundaries are kept clean so work can be split if teammates join in Round 3.
 
 ## Module ownership and files
 
 | Module | Owner | Files | Provides |
 | --- | --- | --- | --- |
-| Auth & permissions | Shravani | `backend/app/auth/` | Session tokens, `require_member()` role and access-level checks |
-| Projects & jobs | Shravani | `backend/app/projects/`, `backend/app/pipeline.py` | Projects, members, analysis job orchestration |
+| Auth & permissions | Shravani | `backend/app/auth/` | Accounts (sign up / sign in), session tokens, previews, `require_member()` role and access-level checks |
+| Team & invites (Round 3) | Shravani | `backend/app/team/` | Invite links, joining, member status, removing access |
+| Ask Baton (Round 3) | Shravani | `backend/app/ask/` | Access-filtered retrieval, cited answers, quote check, routing to people |
+| Projects & jobs | Shravani | `backend/app/projects/`, `backend/app/pipeline.py` | Projects, members, full and update analysis runs, check for changes |
 | Sources (Connect) | Shravani | `backend/app/sources/`, `backend/app/ingest/github.py`, `ingest/storage.py` | Uploads, GitHub import, raw file storage |
 | Ingest (Reconstruct, part 1) | Shravani | `backend/app/ingest/parsers.py`, `redact.py`, `service.py`, `router.py` | Evidence units, redaction, evidence API |
 | Extract (Reconstruct, part 2) | Shravani | `backend/app/extract/`, `backend/app/llm/` | Gemini claim extraction, provider chain, cache |
 | Verify | Shravani | `backend/app/verify/` | Gate 1 quote check, gate 2 support check, confidence labels, review actions |
 | Detect | Shravani | `backend/app/detect/` | Dedupe, conflicts, gaps, departure interview |
-| Handover & share | Shravani | `backend/app/handover/`, `backend/app/share/` | Draft/approve versions, role-filtered views, acknowledgements |
+| Handover & share | Shravani | `backend/app/handover/`, `backend/app/share/` | Draft/approve versions, version diffs, changed-since-approval flags, role-filtered views, acknowledgements |
 | Audit | Shravani | `backend/app/audit/` | Append-only event log |
 | Database | Shravani | `backend/app/models.py`, `backend/app/db.py`, `backend/sql/schema.sql` | Tables, RLS script, Postgres/SQLite engine |
 | Frontend | Shravani | `frontend/src/**` | All screens, API layer (`src/lib/api.ts`) |

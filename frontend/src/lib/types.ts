@@ -12,13 +12,33 @@ export interface Person {
   id: string;
   name: string;
   handle: string | null;
+  email?: string | null;
 }
 
 export interface Me {
   account: { id: string; kind: string };
   user: Person | null;
+  real_user: Person | null;
+  previewing: boolean;
+  registered: boolean;
+  is_demo: boolean;
   people: Person[];
   projects: { id: string; name: string; is_demo: boolean; role: string }[];
+}
+
+export interface Invite {
+  id: string;
+  user_id: string;
+  role: string;
+  access_level: string;
+  state: "pending" | "accepted" | "revoked" | "expired";
+  email_hint: string | null;
+  created_at: string;
+  expires_at: string;
+  token?: string;
+  path?: string;
+  name?: string;
+  project?: string;
 }
 
 export interface Member {
@@ -27,10 +47,45 @@ export interface Member {
   handle: string | null;
   role: string;
   access_level: string;
+  joined: boolean;
+  is_you: boolean;
+  status: "joined" | "invited" | "not_invited";
+  invite: Invite | null;
+}
+
+export interface QuestionCitation {
+  evidence_id: string;
+  code: string;
+  quote: string;
+  source: string;
+  author: string | null;
+  date: string | null;
+  start: number | null;
+  end: number | null;
+  text: string;
+  kind: string;
+  access_label?: string;
+  location?: Record<string, string | number>;
+}
+
+export interface Question {
+  id: string;
+  question: string;
+  status: "answered" | "unanswered" | "sent" | "answered_by_person";
+  answer: string | null;
+  citations: QuestionCitation[];
+  rejected_quotes: number;
+  asked_by: string;
+  person_answer: string | null;
+  person_answer_by: string | null;
+  sent: boolean;
+  created_at: string;
+  model: string;
 }
 
 export interface Job {
   id: string;
+  kind?: "analyse" | "update";
   status: "queued" | "running" | "done" | "failed";
   stage: string;
   warnings: string[];
@@ -47,7 +102,7 @@ export interface Overview {
   counts: Record<string, number>;
   steps: { key: string; label: string; done: boolean }[];
   latest_job: Job | null;
-  handover: { versions: number; approved_version: number | null };
+  handover: { versions: number; approved_version: number | null; outdated?: boolean; draft_version?: number | null };
   ai: { configured: boolean; chain: string[] };
 }
 
@@ -175,7 +230,19 @@ export interface HandoverItem {
   open_gap?: string;
   action?: string;
   review_state?: string;
+  change?: "added" | "changed";
+  changed_since_approval?: string;
   evidence: HandoverEvidence[];
+}
+
+export interface HandoverDiff {
+  base_version?: number;
+  total?: number;
+  hidden?: number;
+  sections?: Record<
+    string,
+    { added: { text: string }[]; changed: { before: string; after: string }[]; removed: { text: string }[] }
+  >;
 }
 
 export interface Handover {
@@ -193,4 +260,9 @@ export interface Handover {
   };
   viewer: { name: string; role: string; access_level: number };
   acknowledged: string[];
+  diff?: HandoverDiff;
+  changes?: number | null;
+  base_version?: number | null;
+  changed_since_approval?: number;
+  update_in_review?: boolean;
 }

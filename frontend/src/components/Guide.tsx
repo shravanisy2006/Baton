@@ -14,11 +14,13 @@ interface Step {
   page: string; // "" = overview, otherwise the sub-path
   target: string; // data-guide value(s) on that page, first visible one wins
   hideIf?: string; // stay quiet while this element is open (e.g. the person is typing a reason)
+  passive?: boolean; // a gentle tip for its own page only; never pulls you away from other pages
   title: string;
   text: string;
 }
 
 const PAGE_NAME: Record<string, string> = {
+  ask: "Ask Baton",
   "": "Overview",
   sources: "Sources",
   gaps: "Gaps & Conflicts",
@@ -73,14 +75,30 @@ function useStep(): Step | null {
     if (c.pending_review)
       return { key: "review", page: "review", target: "review-actions", hideIf: "review-form", title: `Step 4 · Review claims (${c.pending_review} left)`,
         text: "Check that the highlighted quote really says what the claim says. Approve it, or Reject it if it's wrong. Only approved claims reach the handover." };
+    if (c.new_evidence)
+      return { key: "new-evidence", page: "", target: "run-analysis-top", title: "New evidence arrived",
+        text: "Analyse only what's new. Every review decision you've made is kept; anything that contradicts the approved handover is flagged." };
     if (!o.handover.approved_version)
-      return o.handover.versions
+      return o.handover.draft_version
         ? { key: "approve-h", page: "handover", target: "approve-handover", title: "Step 6 · Approve and share",
             text: `Read the draft, then approve it. Only then can ${incoming} see it.` }
         : { key: "generate", page: "handover", target: "generate", title: "Step 5 · Build the handover",
             text: "Turn the approved claims into a handover draft. Every line will link to its evidence." };
+    if (o.handover.outdated)
+      return o.handover.draft_version
+        ? { key: "approve-v", page: "handover", target: "approve-handover", title: "Share the update",
+            text: `The draft shows exactly what changed since version ${o.handover.approved_version}. Approve it, and ${incoming} only re-reads the changed sections.` }
+        : { key: "regen", page: "handover", target: "generate", title: "Make the next version",
+            text: `Things changed since version ${o.handover.approved_version} was approved. Build version ${o.handover.approved_version + 1}; Baton shows what changed.` };
+    const waiting = o.members.find((m) => m.role === "incoming" && m.status === "not_invited");
+    if (!o.project.is_demo && waiting)
+      return { key: "invite", page: "", target: "invite-incoming", title: `Invite ${waiting.name}`,
+        text: `Create a one-time link so ${waiting.name} can sign in with their own account and read the handover. You can preview their view meanwhile.` };
+    if (!o.project.is_demo)
+      return { key: "living", page: "", target: "run-analysis-top", passive: true, title: "Keep it up to date",
+        text: "When new work happens, upload newer files or press Check for changes. Baton re-reads only what's new and flags approved lines that changed." };
     return { key: "switch", page: "*", target: "switch-person", title: "Done · See it as the new member",
-      text: `Switch to ${incoming} here to see exactly what they see. Switch to ${departing} to answer the open questions.` };
+      text: `Switch to ${incoming} here to see exactly what they see, and try Ask Baton. Switch to ${departing} to answer the open questions.` };
   }
   if (role === "departing") {
     if (c.open_gaps)
@@ -93,8 +111,8 @@ function useStep(): Step | null {
     return { key: "back-i", page: "*", target: "switch-person", title: "Not shared yet",
       text: "The reviewer hasn't approved a handover yet. Switch back to the reviewer here to finish reviewing and approve it." };
   if (role === "incoming" && o.handover.approved_version)
-    return { key: "ack", page: "handover", target: "ack", title: "Read your handover",
-      text: "Click any line to see the evidence behind it. When you've read a section, mark it as read." };
+    return { key: "ack", page: "handover", target: "ack,nav-ask", title: "Read your handover",
+      text: "Click any line to see the evidence behind it, and mark each section as read. Still have a question? Ask Baton answers from the evidence." };
   return null;
 }
 
@@ -151,7 +169,7 @@ export default function Guide() {
     };
   }, [on, step?.key, target]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!step) return null;
+  if (!step || (sub === "ask" && step.key === "ack") || (step.passive && !onPage)) return null;
   if (!on)
     return (
       <button

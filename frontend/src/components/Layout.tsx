@@ -5,11 +5,12 @@ import {
   GitCompareArrows,
   LayoutDashboard,
   ListChecks,
+  MessageCircleQuestion,
   ScrollText,
   Search,
   Send,
 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useApi } from "../lib/hooks";
@@ -18,6 +19,7 @@ import type { Overview } from "../lib/types";
 import { Button, cx, ErrorBox, Pill, Spinner } from "./ui";
 import Logo from "./Logo";
 import Guide from "./Guide";
+import AccountMenu from "./AccountMenu";
 
 const NAV = [
   { to: "", label: "Overview", icon: LayoutDashboard, need: "any" },
@@ -27,15 +29,22 @@ const NAV = [
   { to: "gaps", label: "Gaps & Conflicts", icon: GitCompareArrows, need: "working" },
   { to: "review", label: "Review", icon: ClipboardCheck, need: "review" },
   { to: "handover", label: "Handover", icon: Send, need: "any" },
+  { to: "ask", label: "Ask Baton", icon: MessageCircleQuestion, need: "any" },
   { to: "audit", label: "Audit Log", icon: ScrollText, need: "review" },
 ] as const;
 
 export default function Layout() {
   const { pid = "" } = useParams();
-  const { me, loading: sessionLoading, switchTo } = useSession();
+  const { me, loading: sessionLoading, switchTo, refresh } = useSession();
   const nav = useNavigate();
   const { data, error, loading, reload } = useApi(() => api.get<Overview>(`/projects/${pid}`), [pid, me?.user?.id]);
   const [switching, setSwitching] = useState(false);
+
+  // People named or invited since sign-in become previewable: keep the session's list fresh.
+  const memberKey = (data?.members ?? []).map((m) => m.user_id + m.status).join(",");
+  useEffect(() => {
+    if (memberKey) refresh();
+  }, [memberKey, refresh]);
 
   const reloadQuiet = useCallback(() => reload(true), [reload]);
 
@@ -43,9 +52,9 @@ export default function Layout() {
   if (!me) {
     return (
       <div className="mx-auto max-w-md p-10">
-        <ErrorBox message="Your session has ended. Open the demo again from the home page." />
-        <Button className="mt-4" onClick={() => nav("/")}>
-          Go to home page
+        <ErrorBox message="You're signed out. Sign in to open this project." />
+        <Button className="mt-4" onClick={() => nav(`/signin?mode=signin&next=${encodeURIComponent(`/p/${pid}`)}`)}>
+          Sign in
         </Button>
       </div>
     );
@@ -55,6 +64,12 @@ export default function Layout() {
   const canReview = role === "admin" || role === "reviewer";
   const canSeeWorking = canReview || role === "departing";
   const allowed = (need: string) => need === "any" || (need === "working" && canSeeWorking) || (need === "review" && canReview);
+
+  // Who you can switch to: everyone in the worked example; in your own projects, yourself plus people who
+  // haven't joined with their own account yet (a preview, clearly labelled).
+  const switchable = new Set((me.people ?? []).map((p) => p.id));
+  const options = (data?.members ?? []).filter((m) => switchable.has(m.user_id) || m.user_id === data?.me.user_id);
+  const isDemo = !!data?.project.is_demo;
 
   async function onSwitch(userId: string) {
     setSwitching(true);
@@ -112,29 +127,55 @@ export default function Layout() {
             <span className="truncate font-semibold text-slate-900">{data?.project.name ?? "…"}</span>
             {data?.project.is_demo && <Pill className="bg-amber-100 text-amber-800">Synthetic demo</Pill>}
           </div>
-          {data && (
-            <label className="flex min-w-0 max-w-full items-center gap-2 text-sm">
-              <span className="text-slate-500">Viewing as</span>
-              <select
-                className="min-w-0 max-w-[230px] truncate rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm shadow-sm sm:max-w-none"
-                value={data.me.user_id}
-                disabled={switching}
-                onChange={(e) => onSwitch(e.target.value)}
-                aria-label="Switch person"
-                data-guide="switch-person"
-              >
-                {data.members.map((m) => (
-                  <option key={m.user_id} value={m.user_id}>
-                    {m.name} — {ROLE_LABEL[m.role] ?? m.role} ({m.access_level})
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
+            {data && options.length > 1 && (
+              <label className="flex min-w-0 max-w-full items-center gap-2 text-sm">
+                <span className="text-slate-500">{isDemo ? "Viewing as" : "Preview as"}</span>
+                <select
+                  className="min-w-0 max-w-[230px] truncate rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm shadow-sm sm:max-w-none"
+                  value={data.me.user_id}
+                  disabled={switching}
+                  onChange={(e) => onSwitch(e.target.value)}
+                  aria-label="Switch person"
+                  data-guide="switch-person"
+                >
+                  {options.map((m) => (
+                    <option key={m.user_id} value={m.user_id}>
+                      {m.name} — {ROLE_LABEL[m.role] ?? m.role} ({m.access_level})
+                      {!isDemo && m.user_id === me.real_user?.id ? " · you" : ""}
+                      {!isDemo && m.user_id !== me.real_user?.id ? " · not joined yet" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {data && options.length <= 1 && (
+              <span className="text-sm text-slate-500">
+                {data.me.name} · {ROLE_LABEL[role] ?? role}
+              </span>
+            )}
+            <AccountMenu />
+          </div>
         </header>
+        {me.previewing && data && (
+          <div className="no-print border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 sm:px-8">
+            You're previewing what <b>{data.me.name}</b> sees. They haven't joined yet; anything you do here is logged as{" "}
+            <b>{me.real_user?.name} (previewing as {data.me.name})</b>.{" "}
+            <button className="font-medium underline" disabled={switching} onClick={() => me.real_user && onSwitch(me.real_user.id)}>
+              Back to me
+            </button>
+          </div>
+        )}
         <main className="print-full mx-auto max-w-6xl px-4 py-6 sm:px-8">
           {loading && !data && <Spinner />}
-          {error && <ErrorBox message={error.message} onRetry={() => reload()} />}
+          {error && (
+            <div className="space-y-3">
+              <ErrorBox message={error.message} onRetry={() => reload()} />
+              <Button variant="secondary" onClick={() => nav("/projects")}>
+                Back to your projects
+              </Button>
+            </div>
+          )}
           {data && (
             <ProjectContext.Provider
               value={{ overview: data, reload: reloadQuiet, role, canManage: canReview, canReview, canSeeWorking }}

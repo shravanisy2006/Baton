@@ -6,6 +6,7 @@
 -- Baton API, which checks project membership, role and access label (Team/Leads/Restricted) in every
 -- query. Row-Level Security is switched ON for every table with NO policies, so Supabase's public
 -- REST API (anon / authenticated keys) can read nothing. Only the API's database user can.
+-- Passwords are stored only as salted scrypt hashes; invite links only as SHA-256 hashes.
 
 CREATE TABLE IF NOT EXISTS accounts (
 	id VARCHAR(24) NOT NULL, 
@@ -29,11 +30,15 @@ CREATE TABLE IF NOT EXISTS users (
 	account_id VARCHAR(24) NOT NULL, 
 	name VARCHAR(120) NOT NULL, 
 	handle VARCHAR(120), 
+	email VARCHAR(255), 
+	password_hash VARCHAR(255), 
+	merged_into VARCHAR(24), 
 	created_at TIMESTAMP WITH TIME ZONE NOT NULL, 
 	PRIMARY KEY (id), 
 	FOREIGN KEY(account_id) REFERENCES accounts (id)
 );
 CREATE INDEX IF NOT EXISTS ix_users_account_id ON users (account_id);
+CREATE INDEX IF NOT EXISTS ix_users_email ON users (email);
 
 CREATE TABLE IF NOT EXISTS projects (
 	id VARCHAR(24) NOT NULL, 
@@ -87,6 +92,9 @@ CREATE TABLE IF NOT EXISTS claims (
 	leaver_evidence_id VARCHAR(24), 
 	access_label INTEGER NOT NULL, 
 	extractor VARCHAR(80) NOT NULL, 
+	changed_note TEXT, 
+	changed_at TIMESTAMP WITH TIME ZONE, 
+	job_id VARCHAR(24), 
 	created_at TIMESTAMP WITH TIME ZONE NOT NULL, 
 	PRIMARY KEY (id), 
 	FOREIGN KEY(project_id) REFERENCES projects (id) ON DELETE CASCADE
@@ -99,6 +107,7 @@ CREATE TABLE IF NOT EXISTS handover_versions (
 	version INTEGER NOT NULL, 
 	status VARCHAR(16) NOT NULL, 
 	snapshot JSON NOT NULL, 
+	diff JSON NOT NULL, 
 	created_by VARCHAR(24), 
 	approved_by VARCHAR(24), 
 	approved_at TIMESTAMP WITH TIME ZONE, 
@@ -107,6 +116,27 @@ CREATE TABLE IF NOT EXISTS handover_versions (
 	FOREIGN KEY(project_id) REFERENCES projects (id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS ix_handover_versions_project_id ON handover_versions (project_id);
+
+CREATE TABLE IF NOT EXISTS invites (
+	id VARCHAR(24) NOT NULL, 
+	project_id VARCHAR(24) NOT NULL, 
+	user_id VARCHAR(24) NOT NULL, 
+	token_hash VARCHAR(64) NOT NULL, 
+	role VARCHAR(16) NOT NULL, 
+	access_level INTEGER NOT NULL, 
+	email_hint VARCHAR(255), 
+	created_by VARCHAR(24), 
+	created_at TIMESTAMP WITH TIME ZONE NOT NULL, 
+	expires_at TIMESTAMP WITH TIME ZONE NOT NULL, 
+	accepted_at TIMESTAMP WITH TIME ZONE, 
+	accepted_by VARCHAR(24), 
+	revoked_at TIMESTAMP WITH TIME ZONE, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id) ON DELETE CASCADE, 
+	FOREIGN KEY(user_id) REFERENCES users (id)
+);
+CREATE INDEX IF NOT EXISTS ix_invites_project_id ON invites (project_id);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_invites_token_hash ON invites (token_hash);
 
 CREATE TABLE IF NOT EXISTS jobs (
 	id VARCHAR(24) NOT NULL, 
@@ -138,6 +168,28 @@ CREATE TABLE IF NOT EXISTS memberships (
 CREATE INDEX IF NOT EXISTS ix_memberships_project_id ON memberships (project_id);
 CREATE INDEX IF NOT EXISTS ix_memberships_user_id ON memberships (user_id);
 
+CREATE TABLE IF NOT EXISTS questions (
+	id VARCHAR(24) NOT NULL, 
+	project_id VARCHAR(24) NOT NULL, 
+	asked_by VARCHAR(24) NOT NULL, 
+	asked_by_name VARCHAR(120) NOT NULL, 
+	access_level INTEGER NOT NULL, 
+	question TEXT NOT NULL, 
+	status VARCHAR(24) NOT NULL, 
+	answer TEXT, 
+	citations JSON NOT NULL, 
+	rejected_quotes INTEGER NOT NULL, 
+	gap_id VARCHAR(24), 
+	person_answer TEXT, 
+	person_answer_by VARCHAR(120), 
+	model VARCHAR(80) NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS ix_questions_asked_by ON questions (asked_by);
+CREATE INDEX IF NOT EXISTS ix_questions_project_id ON questions (project_id);
+
 CREATE TABLE IF NOT EXISTS sources (
 	id VARCHAR(24) NOT NULL, 
 	project_id VARCHAR(24) NOT NULL, 
@@ -151,6 +203,7 @@ CREATE TABLE IF NOT EXISTS sources (
 	redactions INTEGER NOT NULL, 
 	coverage JSON NOT NULL, 
 	storage_path VARCHAR(500), 
+	synced_at TIMESTAMP WITH TIME ZONE, 
 	authorised_by VARCHAR(24), 
 	created_at TIMESTAMP WITH TIME ZONE NOT NULL, 
 	PRIMARY KEY (id), 
@@ -204,6 +257,7 @@ CREATE TABLE IF NOT EXISTS evidence_units (
 	occurred_at VARCHAR(40), 
 	location JSON NOT NULL, 
 	access_label INTEGER NOT NULL, 
+	analysed_at TIMESTAMP WITH TIME ZONE, 
 	PRIMARY KEY (id), 
 	FOREIGN KEY(project_id) REFERENCES projects (id) ON DELETE CASCADE, 
 	FOREIGN KEY(source_id) REFERENCES sources (id) ON DELETE CASCADE
@@ -267,8 +321,10 @@ ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE claims ENABLE ROW LEVEL SECURITY;
 ALTER TABLE handover_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE memberships ENABLE ROW LEVEL SECURITY;
+ALTER TABLE questions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sources ENABLE ROW LEVEL SECURITY;
 ALTER TABLE acknowledgements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE conflicts ENABLE ROW LEVEL SECURITY;

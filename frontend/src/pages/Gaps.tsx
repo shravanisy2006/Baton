@@ -13,6 +13,7 @@ const KIND: Record<string, string> = {
   open_question: "Open question",
   conflict: "Conflicting sources",
   unreadable_source: "Unreadable source",
+  asked: "Asked by the new member",
 };
 
 export default function GapsPage() {
@@ -114,6 +115,7 @@ function ConflictCard({ k, canResolve, onDone }: { k: Conflict; canResolve: bool
   const labelB = k.kind === "superseded" ? "Newer decision / instruction" : "Source B says";
 
   async function resolve(body: { winner_claim_id?: string; keep_both?: boolean }, key: string) {
+    if (busy) return;
     setBusy(key);
     setErr(null);
     try {
@@ -173,6 +175,7 @@ function GapCard({ g, isLeaver, canReview, onDone }: { g: Gap; isLeaver: boolean
   const [err, setErr] = useState<string | null>(null);
 
   async function submit(path: string, body: unknown) {
+    if (busy) return;
     setBusy(true);
     setErr(null);
     try {
@@ -192,14 +195,14 @@ function GapCard({ g, isLeaver, canReview, onDone }: { g: Gap; isLeaver: boolean
         <LabelBadge label={g.access_label} />
         {g.status === "answered" && (
           <Pill className="bg-violet-50 text-violet-700">
-            <CheckCircle2 className="h-3 w-3" /> Answered by leaver
+            <CheckCircle2 className="h-3 w-3" /> Answered
           </Pill>
         )}
         {g.status === "dismissed" && <Pill className="bg-slate-100 text-slate-500">Closed</Pill>}
       </div>
       <p className="text-sm font-medium text-slate-900">{g.question}</p>
       {g.answer && <p className="mt-2 rounded-lg bg-violet-50 p-2.5 text-sm text-violet-900">{g.answer}</p>}
-      {g.status === "open" && isLeaver && (
+      {g.status === "open" && (isLeaver || (canReview && g.kind === "asked")) && (
         <form
           className="mt-3 space-y-2"
           data-guide="gap-answer"
@@ -214,7 +217,7 @@ function GapCard({ g, isLeaver, canReview, onDone }: { g: Gap; isLeaver: boolean
           </Button>
         </form>
       )}
-      {g.status === "open" && canReview && !isLeaver && (
+      {g.status === "open" && canReview && !isLeaver && g.kind !== "asked" && (
         <div className="mt-3 flex flex-wrap gap-2">
           <input className={input + " sm:max-w-xs"} placeholder="Reason to close without an answer" value={reason} onChange={(e) => setReason(e.target.value)} />
           <Button size="sm" variant="secondary" loading={busy} disabled={reason.trim().length < 2} onClick={() => submit(`/gaps/${g.id}/dismiss`, { reason })}>

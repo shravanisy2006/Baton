@@ -17,6 +17,8 @@ from .llm.provider import ai_status
 from .projects.router import router as projects_router
 from .share.router import router as share_router
 from .sources.router import router as sources_router
+from .team.router import router as team_router
+from .ask.router import router as ask_router
 from .verify.router import router as claims_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -67,7 +69,7 @@ app.add_middleware(
 )
 
 for r in (auth_router, projects_router, sources_router, evidence_router, claims_router, detect_router,
-          handover_router, share_router, audit_router):
+          handover_router, share_router, audit_router, team_router, ask_router):
     app.include_router(r)
 
 

@@ -9,6 +9,8 @@ interface SessionCtx {
   startDemo: () => Promise<string>;
   startGuest: () => Promise<void>;
   switchTo: (userId: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => void;
 }
 
@@ -63,12 +65,34 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [refresh],
   );
 
+  const signIn = useCallback(
+    async (email: string, password: string) => {
+      const r = await api.post<{ token: string }>("/auth/signin", { email, password });
+      setToken(r.token);
+      await refresh();
+    },
+    [refresh],
+  );
+
+  const signUp = useCallback(
+    async (name: string, email: string, password: string) => {
+      const r = await api.post<{ token: string }>("/auth/signup", { name, email, password });
+      setToken(r.token);
+      await refresh();
+    },
+    [refresh],
+  );
+
   const signOut = useCallback(() => {
     setToken(null);
     setMe(null);
   }, []);
 
-  return <Ctx.Provider value={{ me, loading, refresh, startDemo, startGuest, switchTo, signOut }}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={{ me, loading, refresh, startDemo, startGuest, switchTo, signIn, signUp, signOut }}>
+      {children}
+    </Ctx.Provider>
+  );
 }
 
 export function useSession() {

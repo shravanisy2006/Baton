@@ -45,13 +45,36 @@ class Account(Base):
 
 
 class User(Base):
-    """A person inside a workspace (a persona). Belongs to the account that created it."""
+    """A person. Either a signed-up account holder (has email + password) or a person a reviewer has named
+    but who hasn't joined yet (no email). When that person accepts an invite, their memberships move to their
+    own account and this record is marked merged_into."""
     __tablename__ = "users"
     id: Mapped[str] = mapped_column(String(24), primary_key=True, default=new_id)
     account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), index=True)
     name: Mapped[str] = mapped_column(String(120))
     handle: Mapped[str | None] = mapped_column(String(120), nullable=True)  # e.g. GitHub username
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    merged_into: Mapped[str | None] = mapped_column(String(24), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class Invite(Base):
+    """A one-time link that lets a named person join a project with their own account."""
+    __tablename__ = "invites"
+    id: Mapped[str] = mapped_column(String(24), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))  # the named person this invite is for
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    role: Mapped[str] = mapped_column(String(16))
+    access_level: Mapped[int] = mapped_column(Integer, default=TEAM)
+    email_hint: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    accepted_by: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Project(Base):
@@ -91,6 +114,7 @@ class Source(Base):
     redactions: Mapped[int] = mapped_column(Integer, default=0)
     coverage: Mapped[dict] = mapped_column(JSON, default=dict)
     storage_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     authorised_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
@@ -109,6 +133,7 @@ class EvidenceUnit(Base):
     occurred_at: Mapped[str | None] = mapped_column(String(40), nullable=True)  # ISO date or "YYYY-MM-DD HH:MM"
     location: Mapped[dict] = mapped_column(JSON, default=dict)
     access_label: Mapped[int] = mapped_column(Integer, default=TEAM)
+    analysed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     source: Mapped[Source] = relationship()
 
 
@@ -134,6 +159,10 @@ class Claim(Base):
     leaver_evidence_id: Mapped[str | None] = mapped_column(String(24), nullable=True)
     access_label: Mapped[int] = mapped_column(Integer, default=TEAM)
     extractor: Mapped[str] = mapped_column(String(80), default="")
+    # Living handover: set when evidence that arrived after approval disagrees with or replaces this claim.
+    changed_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    job_id: Mapped[str | None] = mapped_column(String(24), nullable=True)  # the analysis run that found it
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     citations: Mapped[list["ClaimEvidence"]] = relationship(
         back_populates="claim", cascade="all, delete-orphan", order_by="ClaimEvidence.id"
@@ -195,6 +224,7 @@ class HandoverVersion(Base):
     version: Mapped[int] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(16), default="draft")  # draft approved superseded
     snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
+    diff: Mapped[dict] = mapped_column(JSON, default=dict)  # what changed since the previous approved version
     created_by: Mapped[str | None] = mapped_column(String(24), nullable=True)
     approved_by: Mapped[str | None] = mapped_column(String(24), nullable=True)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -235,6 +265,26 @@ class AuditEvent(Base):
     target_id: Mapped[str | None] = mapped_column(String(24), nullable=True)
     detail: Mapped[dict] = mapped_column(JSON, default=dict)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class Question(Base):
+    """Ask Baton: a member's question, answered only from evidence they may see, with checked quotes."""
+    __tablename__ = "questions"
+    id: Mapped[str] = mapped_column(String(24), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    asked_by: Mapped[str] = mapped_column(String(24), index=True)
+    asked_by_name: Mapped[str] = mapped_column(String(120), default="")
+    access_level: Mapped[int] = mapped_column(Integer, default=TEAM)  # asker's level when asked
+    question: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(24), default="answered")  # answered unanswered sent answered_by_person
+    answer: Mapped[str | None] = mapped_column(Text, nullable=True)
+    citations: Mapped[list] = mapped_column(JSON, default=list)
+    rejected_quotes: Mapped[int] = mapped_column(Integer, default=0)
+    gap_id: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    person_answer: Mapped[str | None] = mapped_column(Text, nullable=True)
+    person_answer_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    model: Mapped[str] = mapped_column(String(80), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
 class Job(Base):

@@ -41,3 +41,27 @@ def store_units(db: Session, source: Source, parsed: ParsedSource) -> int:
         source.status = "parsed"
         source.error = None
     return len(parsed.units)
+
+
+def append_new_units(db: Session, source: Source, parsed: ParsedSource) -> int:
+    """GitHub re-sync: store only items that are new or changed since the last sync (by text hash)."""
+    have = {h for (h,) in db.query(EvidenceUnit.text_hash).filter_by(source_id=source.id)}
+    seq = next_seq(db, source.project_id)
+    added = 0
+    for unit in parsed.units:
+        text, n = redact(unit.text)
+        h = _hash(text)
+        if h in have:
+            continue
+        have.add(h)
+        db.add(EvidenceUnit(
+            project_id=source.project_id, source_id=source.id, code=f"E-{seq}", seq=seq,
+            kind=unit.kind, text=text, text_hash=h,
+            author=unit.author or parsed.author, occurred_at=unit.occurred_at or parsed.occurred_at,
+            location=unit.location, access_label=source.access_label,
+        ))
+        source.redactions = (source.redactions or 0) + n
+        seq += 1
+        added += 1
+    source.unit_count = (source.unit_count or 0) + added
+    return added

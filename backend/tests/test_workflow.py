@@ -4,7 +4,7 @@ import io
 from docx import Document
 
 from app.verify.service import find_quote
-from conftest import auth
+from conftest import auth, signup
 
 REVIEWER, LEAVER, NEW, VIEWER = "Priya Nair", "Riya Sharma", "Karan Mehta", "Anika Joshi"
 
@@ -22,7 +22,7 @@ def by_statement(claims, text):
 # ---------- 1-3: parsing ----------
 
 def test_upload_pdf_docx_csv_and_reject_unsupported(client):
-    tok = client.post("/auth/guest").json()["token"]
+    tok = signup(client)
     pid = client.post("/projects", json={"name": "Parsing test"}, headers=auth(tok)).json()["id"]
     doc = Document()
     doc.add_heading("Design notes", 1)
@@ -55,7 +55,7 @@ def test_upload_pdf_docx_csv_and_reject_unsupported(client):
 
 
 def test_redaction_removes_secrets(client):
-    tok = client.post("/auth/guest").json()["token"]
+    tok = signup(client)
     pid = client.post("/projects", json={"name": "Secrets"}, headers=auth(tok)).json()["id"]
     body = b"Deploy notes for the team.\n\napi_key = AIzaSyA1234567890abcdefghijklmnopqrstuv and call 9876543210 if stuck."
     r = client.post(f"/projects/{pid}/sources/upload", files=[("files", ("n.txt", body, "text/plain"))],
@@ -163,6 +163,8 @@ def _approve_all_resolvable(client, demo):
     pid = demo["project_id"]
     reopened = None
     for conflict in client.get(f"/projects/{pid}/conflicts", headers=tok).json()["conflicts"]:
+        if conflict["status"] != "open":
+            continue
         sides = conflict["side_a"] + conflict["side_b"]
         if conflict["kind"] == "status":
             winner = next(c for c in sides if c["status"] == "reopened")
@@ -262,7 +264,7 @@ def test_access_control(client, demo):
     leaver_list = client.get(f"/projects/{pid}/evidence", headers=auth(demo["tokens"][LEAVER])).json()
     assert all("40,000" not in e["text"] for e in leaver_list["evidence"]) and leaver_list["hidden_count"] == 2
     # A different visitor can't see this project at all.
-    other = client.post("/auth/guest").json()["token"]
+    other = signup(client)
     assert client.get(f"/projects/{pid}", headers=auth(other)).status_code == 404
     assert client.get(f"/evidence/{secret['id']}", headers=auth(other)).status_code == 404
     # Nor act as someone in another workspace.
@@ -275,7 +277,7 @@ def test_access_control(client, demo):
 def test_ai_not_configured_is_reported(client):
     from app.llm.provider import set_providers_for_tests
     set_providers_for_tests([])
-    tok = client.post("/auth/guest").json()["token"]
+    tok = signup(client)
     pid = client.post("/projects", json={"name": "No AI"}, headers=auth(tok)).json()["id"]
     client.post(f"/projects/{pid}/sources/upload", files=[("files", ("a.md", b"We decided to use Postgres for everything.", "text/markdown"))],
                 data={"access_label": "Team"}, headers=auth(tok))
@@ -296,7 +298,7 @@ def test_corrected_state_enters_handover(client, demo):
 
 def test_chat_and_json_imports(client):
     import json as _json
-    tok = client.post("/auth/guest").json()["token"]
+    tok = signup(client)
     pid = client.post("/projects", json={"name": "Imports"}, headers=auth(tok)).json()["id"]
     chat = (b"28/10/2026, 18:04 - Priya: The sponsor signed the MoU today!\n"
             b"28/10/2026, 18:06 - Priya: Karan please turn payments back on after the fest\n"
@@ -333,7 +335,7 @@ def test_chat_and_json_imports(client):
 def test_own_project_from_scratch(client):
     import zipfile
 
-    tok = client.post("/auth/guest").json()["token"]
+    tok = signup(client, name="Dr. Mehra")
     body = {"name": "Judge project", "your_name": "Dr. Mehra",
             "departing": {"name": "Riya Sharma", "handle": "riya-dev", "access_level": "Leads"},
             "incoming": {"name": "Karan Mehta", "handle": "karan-m", "access_level": "Leads"}}

@@ -44,16 +44,21 @@ def answer_gap(gap_id: str, body: AnswerIn, s=Depends(current_session), db: Sess
     g = db.get(Gap, gap_id)
     if not g:
         raise HTTPException(404, "Question not found.")
-    m = require_member(db, g.project_id, s, ("departing",))
+    # The leaver answers. Questions the new member asked through Ask Baton can also be answered by a reviewer
+    # (the leaver may already be gone); the answer is labelled with who gave it.
+    m = require_member(db, g.project_id, s, ("departing", "admin", "reviewer") if g.kind == "asked" else ("departing",))
     if g.access_label > m.level:
         raise HTTPException(404, "Question not found.")
     if g.status != "open":
-        raise HTTPException(409, "This question was already handled.")
+        raise HTTPException(409, "This question was already answered.")
     text, _ = redact(body.answer.strip())
+    if not text:
+        raise HTTPException(422, "Write an answer first.")
+    author = f"{s.via.name} (for {m.user.name})" if s.via else m.user.name
     src = _attestation_source(db, g.project_id, g.access_label, m.user.name)
     seq = next_seq(db, g.project_id)
     unit = EvidenceUnit(project_id=g.project_id, source_id=src.id, code=f"E-{seq}", seq=seq, kind="attestation",
-                        text=text, text_hash=_hash(text), author=m.user.name, access_label=g.access_label,
+                        text=text, text_hash=_hash(text), author=author, access_label=g.access_label,
                         location={"gap_id": g.id, "question": g.question})
     db.add(unit)
     db.flush()
@@ -71,6 +76,16 @@ def answer_gap(gap_id: str, body: AnswerIn, s=Depends(current_session), db: Sess
         k = db.get(Conflict, g.conflict_id)
         if k:
             k.resolution_note = f"Leaver says: {text}"
+    if g.kind == "asked":
+        from ..models import Question
+
+        q = db.query(Question).filter_by(gap_id=g.id).first()
+        if q:
+            q.status, q.person_answer, q.person_answer_by = "answered_by_person", text, author
+            q.citations = list(q.citations or []) + [{
+                "evidence_id": unit.id, "code": unit.code, "quote": text, "source": src.filename,
+                "author": author, "date": None, "start": 0, "end": len(text), "text": text, "match": "exact",
+                "kind": "attestation"}]
     audit(db, g.project_id, m.user, "gap.answered", "gap", g.id, evidence=unit.code)
     db.commit()
     return gap_out(g)
@@ -86,6 +101,8 @@ def dismiss_gap(gap_id: str, body: DismissIn, s=Depends(current_session), db: Se
     if not g:
         raise HTTPException(404, "Question not found.")
     m = require_member(db, g.project_id, s, CAN_REVIEW)
+    if g.status != "open":
+        raise HTTPException(409, "This question was already handled.")
     g.status = "dismissed"
     g.answer = f"Dismissed by reviewer: {body.reason.strip()}"
     audit(db, g.project_id, m.user, "gap.dismissed", "gap", g.id, reason=body.reason)
@@ -127,6 +144,8 @@ def resolve_conflict(conflict_id: str, body: ResolveIn, s=Depends(current_sessio
     m = require_member(db, k.project_id, s, CAN_REVIEW)
     if k.access_label > m.level:
         raise HTTPException(404, "Conflict not found.")
+    if k.status == "resolved":
+        raise HTTPException(409, "This conflict was already settled. Refresh the page to see the decision.")
     side_a, side_b = list(k.side_a or [k.claim_a_id]), list(k.side_b or [k.claim_b_id])
     note = body.note.strip()
     if body.keep_both:
@@ -143,6 +162,10 @@ def resolve_conflict(conflict_id: str, body: ResolveIn, s=Depends(current_sessio
             if c:
                 c.review_state = "superseded"
                 c.reviewer_note = f"Superseded when resolving a conflict. {note}".strip()
+        for cid in (side_a if losers is side_b else side_b):
+            c = db.get(Claim, cid)
+            if c and c.changed_note:
+                c.changed_note = None  # the reviewer checked the newer evidence: this line still stands
         k.status, k.winner_claim_id = "resolved", body.winner_claim_id
     if note:
         k.resolution_note = ((k.resolution_note + " | ") if k.resolution_note else "") + f"Reviewer: {note}"

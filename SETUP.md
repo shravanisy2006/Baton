@@ -52,7 +52,19 @@ copy .env.example .env.local
 npm run dev
 ```
 
-Open http://localhost:5173. Click **Try it with your project** to hand over your own files, or **See how it works → Open the example** for the worked example. The first analysis calls Gemini (about 20–60 seconds). Running it again reuses the saved answers and is instant.
+Open http://localhost:5173. Click **Try it with your project** and create an account (local only; no email is sent) to hand over your own files, or **See how it works → Open the example** for the worked example. The first analysis calls Gemini (about 20–60 seconds). Running it again reuses the saved answers and is instant.
+
+To test invites on one computer, copy the invite link from **Overview → People → Invite** and open it in a private (incognito) window with a second account.
+
+### No Gemini key? Use the scripted AI (development only)
+
+Instead of the last backend command, run:
+
+```powershell
+.venv\Scripts\python tests\run_with_fake_ai.py
+```
+
+It starts the same API with the scripted stand-in AI used by the tests (it only "understands" the sample project's files). Never deploy it.
 
 ## 4. Put it on GitHub
 
@@ -63,7 +75,7 @@ Open http://localhost:5173. Click **Try it with your project** to hand over your
 cd $HOME\Documents\baton
 git init
 git add .
-git commit -m "Baton Round 2 MVP"
+git commit -m "Baton"
 git branch -M main
 git remote add origin https://github.com/shravanisy2006/Baton.git
 git push -u origin main
@@ -81,6 +93,9 @@ Follow [DEPLOY.md](DEPLOY.md): Supabase (database), then Render (backend), then 
 | --- | --- |
 | `python` not found | Reinstall Python with "Add to PATH" ticked, then open a new terminal |
 | Demo shows "AI is not configured" | `GEMINI_API_KEY` is missing in `backend/.env` (local) or in Render's environment |
-| Analysis fails with 429 / quota | The free Gemini limit was reached. Wait a minute and press *Re-run analysis*. The backup model is used automatically |
+| Analysis fails with 429 / quota | The free Gemini limit was reached. Wait a minute and press *Re-run* / *Analyse new evidence*. The backup model is used automatically |
+| Ask Baton says the AI is busy | Same as above: ask again in a minute |
+| "Email or password is incorrect" | Accounts are per database: an account made on your PC doesn't exist on the deployed site, and vice versa |
+| Invite link says "not valid" | The link was replaced by a newer one, cancelled, or is from a different database (PC vs deployed) |
 | Frontend says it can't reach the server | Backend not running, wrong `VITE_API_URL`, or Render is waking up |
 | CORS error in the browser console | Add the exact frontend URL to `CORS_ORIGINS` on Render |

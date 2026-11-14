@@ -1,11 +1,13 @@
 import { FolderPlus, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, API_URL } from "../lib/api";
 import { useApi } from "../lib/hooks";
 import { ROLE_LABEL, useSession } from "../lib/session";
 import { Button, Card, Empty, ErrorBox, input, Pill, select, Spinner } from "../components/ui";
 import Logo from "../components/Logo";
+import AccountMenu from "../components/AccountMenu";
+import AuthForm from "../components/AuthForm";
 
 interface Row {
   id: string;
@@ -16,28 +18,31 @@ interface Row {
 }
 
 export default function Projects() {
-  const { me, loading: sLoading, startGuest, startDemo } = useSession();
+  const { me, loading: sLoading, startDemo, switchTo } = useSession();
   const nav = useNavigate();
   const { data, error, loading, reload } = useApi(() => (me ? api.get<Row[]>("/projects") : Promise.resolve([])), [me?.user?.id]);
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
-  const [yourName, setYourName] = useState("");
   const [leaver, setLeaver] = useState({ name: "", handle: "", access_level: "Leads" });
   const [joiner, setJoiner] = useState({ name: "", handle: "", access_level: "Leads" });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // Coming back here while previewing someone: switch back to yourself.
+  useEffect(() => {
+    if (me?.previewing && me.real_user) switchTo(me.real_user.id).catch(() => undefined);
+  }, [me?.previewing, me?.real_user, switchTo]);
+
   async function create(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
     setBusy(true);
     setErr(null);
     try {
-      if (!me) await startGuest();
       const person = (x: typeof leaver) => (x.name.trim() ? { ...x, handle: x.handle.trim() || null } : null);
       const p = await api.post<{ id: string }>("/projects", {
         name,
         description: desc,
-        your_name: yourName.trim() || null,
         departing: person(leaver),
         incoming: person(joiner),
       });
@@ -56,19 +61,24 @@ export default function Projects() {
           <Link to="/">
             <Logo />
           </Link>
-          <Button variant="secondary" onClick={async () => nav(`/p/${await startDemo()}`)}>
-            <Sparkles className="h-4 w-4" /> Open the worked example
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button variant="secondary" onClick={async () => nav(`/p/${await startDemo()}`)}>
+              <Sparkles className="h-4 w-4" /> <span className="hidden sm:inline">Open the</span> worked example
+            </Button>
+            <AccountMenu />
+          </div>
         </div>
       </header>
       <main className="mx-auto grid max-w-5xl gap-6 px-5 py-8 lg:grid-cols-[1fr_340px]">
         <section>
-          <h1 className="mb-4 text-xl font-semibold text-slate-900">Your workspaces</h1>
+          <h1 className="mb-4 text-xl font-semibold text-slate-900">Your projects</h1>
           {(sLoading || loading) && <Spinner />}
           {error && <ErrorBox message={error.message} onRetry={reload} />}
           {data && data.length === 0 && (
-            <Empty icon={<FolderPlus className="h-8 w-8" />} title="No workspaces yet">
-              Create one on the right to hand over a real project, or open the demo.
+            <Empty icon={<FolderPlus className="h-8 w-8" />} title="No projects yet">
+              {me?.registered
+                ? "Create one on the right to hand over a real project. If someone invited you, open the link they sent."
+                : "Create a free account on the right to hand over a real project, or open the worked example."}
             </Empty>
           )}
           <div className="space-y-3">
@@ -86,6 +96,7 @@ export default function Projects() {
             ))}
           </div>
         </section>
+        {me?.registered ? (
         <Card className="h-fit p-5">
           <h2 className="font-semibold text-slate-900">Hand over your own project</h2>
           <p className="mt-1 text-sm text-slate-500">
@@ -96,9 +107,10 @@ export default function Projects() {
               <input className={input} placeholder="Project name, e.g. Library app" value={name} onChange={(e) => setName(e.target.value)} required minLength={2} />
               <textarea className={input} placeholder="What is this project? (optional)" rows={2} value={desc} onChange={(e) => setDesc(e.target.value)} />
             </Field>
-            <Field label="You (the reviewer who approves the handover)">
-              <input className={input} placeholder="Your name" value={yourName} onChange={(e) => setYourName(e.target.value)} required />
-            </Field>
+            <p className="text-xs text-slate-500">
+              You ({me?.real_user?.name}) are the reviewer who approves the handover. You can invite both people once the
+              project exists.
+            </p>
             <PersonFields title="Who is leaving?" v={leaver} set={setLeaver} />
             <PersonFields title="Who is taking over?" v={joiner} set={setJoiner} />
             {err && <ErrorBox message={err} />}
@@ -111,6 +123,16 @@ export default function Projects() {
             </p>
           </form>
         </Card>
+        ) : (
+          <Card className="h-fit p-5">
+            <h2 className="font-semibold text-slate-900">Hand over your own project</h2>
+            <p className="mb-4 mt-1 text-sm text-slate-500">
+              Create a free account first. You'll be the reviewer, and you can invite the person leaving and the person taking
+              over to sign in themselves.
+            </p>
+            <AuthForm compact onDone={() => reload()} />
+          </Card>
+        )}
       </main>
     </div>
   );

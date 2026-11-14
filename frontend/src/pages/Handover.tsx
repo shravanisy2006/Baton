@@ -1,9 +1,9 @@
-import { CheckCircle2, Download, ExternalLink, FileCheck2, Lock, Send, ShieldCheck, Sparkles } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, ExternalLink, FileCheck2, GitCompare, Lock, Send, ShieldCheck, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { api, ApiError } from "../lib/api";
 import { useApi } from "../lib/hooks";
 import { ROLE_LABEL, useProject } from "../lib/session";
-import type { Evidence, Handover, HandoverEvidence, HandoverItem } from "../lib/types";
+import type { Evidence, Handover, HandoverDiff, HandoverEvidence, HandoverItem } from "../lib/types";
 import { Button, Card, ConfidenceBadge, Drawer, Empty, ErrorBox, Highlighted, LabelBadge, Notice, PageHeader, Pill, Spinner } from "../components/ui";
 import { locationText } from "./Evidence";
 
@@ -16,6 +16,7 @@ export default function HandoverPage() {
   const [open, setOpen] = useState<HandoverItem | null>(null);
 
   async function run(key: string, fn: () => Promise<unknown>) {
+    if (busy) return;
     setBusy(key);
     setErr(null);
     try {
@@ -45,7 +46,8 @@ export default function HandoverPage() {
           <div className="no-print flex flex-wrap gap-2">
             {canReview && (
               <Button data-guide="generate" variant={d ? "secondary" : "primary"} loading={busy === "gen"} onClick={() => run("gen", () => api.post(`/projects/${pid}/handover/generate`))}>
-                <Sparkles className="h-4 w-4" /> {d ? "Regenerate draft" : "Generate handover"}
+                <Sparkles className="h-4 w-4" />{" "}
+                {!d ? "Generate handover" : d.status === "draft" ? "Regenerate draft" : `Make version ${d.version + 1}`}
               </Button>
             )}
             {canReview && d?.status === "draft" && (
@@ -89,6 +91,24 @@ export default function HandoverPage() {
               Viewing as {d.viewer.name} ({ROLE_LABEL[d.viewer.role] ?? d.viewer.role})
             </span>
           </Card>
+          {d.update_in_review && d.status === "approved" && (
+            <Notice tone="warn">
+              <span className="inline-flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  Newer evidence has arrived since this version was approved. Lines marked <b>Changed since approval</b> may be
+                  out of date{canReview ? "; settle them, then make the next version" : "; the reviewer is checking them and will share an updated version"}.
+                </span>
+              </span>
+            </Notice>
+          )}
+          {d.diff && (d.diff.total ?? 0) + (d.diff.hidden ?? 0) > 0 && <DiffPanel diff={d.diff} version={d.version} sections={d.content.sections} />}
+          {role === "incoming" && d.status === "approved" && d.diff?.base_version && d.acknowledged.length > 0 && (
+            <p className="text-xs text-slate-500">
+              Sections that didn't change since version {d.diff.base_version} keep your earlier acknowledgement. Only changed
+              sections need reading again.
+            </p>
+          )}
           {d.content.hidden_count > 0 && (
             <Notice>
               <span className="inline-flex items-center gap-2">
@@ -146,6 +166,51 @@ export default function HandoverPage() {
   );
 }
 
+function DiffPanel({ diff, version, sections }: { diff: HandoverDiff; version: number; sections: { key: string; title: string }[] }) {
+  const titles = Object.fromEntries(sections.map((s) => [s.key, s.title]));
+  const entries = Object.entries(diff.sections ?? {});
+  return (
+    <Card className="border-sky-200 p-5">
+      <h2 className="flex items-center gap-2 font-semibold text-slate-900">
+        <GitCompare className="h-4 w-4 text-sky-600" /> What changed since version {diff.base_version}
+      </h2>
+      <p className="mt-1 text-sm text-slate-500">
+        Version {version} compared line by line with the last approved version.
+        {diff.hidden ? ` ${diff.hidden} change(s) in sources above your access level are not shown.` : ""}
+      </p>
+      <div className="mt-3 space-y-3">
+        {entries.map(([key, part]) => (
+          <div key={key}>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{titles[key] ?? key}</div>
+            <ul className="mt-1 space-y-1 text-sm">
+              {part.added.map((x, i) => (
+                <li key={"a" + i} className="flex gap-2">
+                  <span className="font-mono text-emerald-600">+</span>
+                  <span className="text-slate-800">{x.text}</span>
+                </li>
+              ))}
+              {part.changed.map((x, i) => (
+                <li key={"c" + i} className="flex gap-2">
+                  <span className="font-mono text-sky-600">~</span>
+                  <span className="text-slate-800">
+                    {x.after} <span className="text-xs text-slate-400">(was: {x.before})</span>
+                  </span>
+                </li>
+              ))}
+              {part.removed.map((x, i) => (
+                <li key={"r" + i} className="flex gap-2">
+                  <span className="font-mono text-rose-600">−</span>
+                  <span className="text-slate-500 line-through">{x.text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 export function statusText(s: string) {
   return ({ todo: "to do", in_progress: "in progress", done: "done", blocked: "blocked", reopened: "reopened", unknown: "unknown" } as Record<string, string>)[s] ?? s;
 }
@@ -180,8 +245,18 @@ function Item({ it, onOpen }: { it: HandoverItem; onOpen: (i: HandoverItem) => v
           (clickable ? "cursor-pointer hover:border-brand-500/50 hover:bg-brand-50/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" : "")
         }
       >
+        {it.changed_since_approval && (
+          <p className="mb-2 flex items-start gap-1.5 rounded bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              <b>Changed since approval.</b> {it.changed_since_approval}
+            </span>
+          </p>
+        )}
         <div className="flex flex-wrap items-start gap-2">
           <p className="flex-1 text-sm font-medium text-slate-900">{it.action ?? it.text}</p>
+          {it.change === "added" && <Pill className="bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">New in this version</Pill>}
+          {it.change === "changed" && <Pill className="bg-sky-50 text-sky-700 ring-1 ring-sky-200">Updated in this version</Pill>}
           <ConfidenceBadge value={it.confidence} />
           {it.review_state === "corrected" && <Pill className="bg-sky-50 text-sky-700 ring-1 ring-sky-200">Corrected</Pill>}
           {it.access_label && it.access_label !== "Team" && <LabelBadge label={it.access_label} />}

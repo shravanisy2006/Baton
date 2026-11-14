@@ -64,6 +64,12 @@ def _add_missing_columns() -> None:
                 if col.name not in have:
                     ddl = col.type.compile(dialect=engine.dialect)
                     conn.execute(text(f'ALTER TABLE {table.name} ADD COLUMN {col.name} {ddl}'))
+                    if (table.name, col.name) == ("evidence_units", "analysed_at"):
+                        # Evidence in projects that were already analysed counts as analysed, so the first
+                        # "Analyse new evidence" after the upgrade doesn't redo everything.
+                        conn.execute(text(
+                            "UPDATE evidence_units SET analysed_at = CURRENT_TIMESTAMP WHERE project_id IN "
+                            "(SELECT project_id FROM jobs WHERE status = 'done')"))
 
 
 def _load_demo_cache() -> None:
@@ -73,8 +79,10 @@ def _load_demo_cache() -> None:
     from .config import BACKEND_DIR
     from .models import LLMCache
 
+    import os
+
     path = BACKEND_DIR / "seed" / "eventapp" / "llm_cache.json"
-    if not path.exists():
+    if os.environ.get("BATON_SKIP_DEMO_CACHE") or not path.exists():
         return
     rows = json.loads(path.read_text(encoding="utf-8"))
     with SessionLocal() as db:
