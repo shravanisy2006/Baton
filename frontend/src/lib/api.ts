@@ -65,3 +65,34 @@ export const api = {
   post: <T,>(p: string, body?: unknown) => request<T>("POST", p, body ?? {}),
   upload: <T,>(p: string, form: FormData) => request<T>("POST", p, form, true),
 };
+
+/** Download a file the API generates (e.g. the handover PDF), with the session token. */
+export async function downloadFile(path: string, fallbackName: string): Promise<void> {
+  const token = getToken() ?? memoryToken;
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  } catch {
+    throw new ApiError(0, "Can't reach the Baton server. Please try again in a moment.");
+  }
+  if (!res.ok) {
+    let msg = `Download failed (${res.status})`;
+    try {
+      const data = await res.json();
+      if (typeof data.detail === "string") msg = data.detail;
+    } catch {
+      /* keep default */
+    }
+    throw new ApiError(res.status, msg);
+  }
+  const blob = await res.blob();
+  const m = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "");
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = m ? m[1] : fallbackName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}

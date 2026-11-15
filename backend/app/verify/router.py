@@ -121,3 +121,32 @@ def review_claim(claim_id: str, body: ReviewIn, s=Depends(current_session), db: 
           valid_citations=len(valid_citations(c)), reason=body.reason)
     db.commit()
     return claim_out(c, m.level, detail=True)
+
+
+@router.post("/claims/{claim_id}/second-opinion")
+def second_opinion_check(claim_id: str, s=Depends(current_session), db: Session = Depends(get_db)):
+    """Reviewer thinks the support check was too strict: ask the other AI model to judge this claim alone.
+    The quote must still be found word for word; this only re-asks whether it supports the claim."""
+    from ..llm.provider import AIUnavailable, InvalidAIOutput
+    from .service import second_opinion
+
+    c = db.get(Claim, claim_id)
+    if not c:
+        raise HTTPException(404, "Claim not found.")
+    m = require_member(db, c.project_id, s, CAN_REVIEW)
+    if c.access_label > m.level:
+        raise HTTPException(404, "Claim not found.")
+    if not valid_citations(c):
+        raise HTTPException(409, "This claim has no quote that was found word for word, so a second opinion can't help. "
+                                 "Reject it, or approve it as Reviewer-asserted with a reason.")
+    if c.support == "supports":
+        raise HTTPException(409, "The support check already agrees with this claim.")
+    before = c.support
+    try:
+        verdict = second_opinion(db, c)
+    except (AIUnavailable, InvalidAIOutput) as e:
+        raise HTTPException(503, f"The AI is busy right now. Try again in a minute. ({str(e)[:120]})") from e
+    refresh_confidence(db, c)
+    audit(db, c.project_id, m.user, "claim.second_opinion", "claim", c.id, before=before, after=verdict)
+    db.commit()
+    return claim_out(c, m.level, detail=True)

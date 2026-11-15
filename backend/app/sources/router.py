@@ -62,7 +62,16 @@ async def upload_sources(project_id: str, files: list[UploadFile] = File(...), a
             src.coverage = {"storage_error": str(e)[:200]}
         try:
             src.kind, parsed = parse_file(data, name)
+            if parsed.needs_ocr:
+                from ..ingest.ocr import transcribe
+
+                ocr_pages = len(parsed.needs_ocr)
+                transcribe(db, parsed, name)
+            else:
+                ocr_pages = 0
             store_units(db, src, parsed)
+            if ocr_pages:
+                src.coverage = {**(src.coverage or {}), "ocr_pages": ocr_pages}
         except ParseError as e:
             src.status, src.error = "failed", str(e)
         audit(db, project_id, m.user, "source.uploaded", "source", src.id, filename=name,

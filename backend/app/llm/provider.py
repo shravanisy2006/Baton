@@ -33,7 +33,7 @@ class Provider:
     name = "base"
     model = ""
 
-    def generate(self, system: str, prompt: str, schema: type[BaseModel]) -> str:  # returns raw JSON text
+    def generate(self, system: str, prompt: str, schema: type[BaseModel], images=None) -> str:  # returns raw JSON
         raise NotImplementedError
 
 
@@ -48,12 +48,13 @@ class GeminiProvider(Provider):
         self.client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=90_000))
         self.model = model
 
-    def generate(self, system: str, prompt: str, schema: type[BaseModel]) -> str:
+    def generate(self, system: str, prompt: str, schema: type[BaseModel], images=None) -> str:
         from google.genai import types
 
+        contents = [types.Part.from_bytes(data=b, mime_type=mime) for b, mime in (images or [])] + [prompt]
         resp = self.client.models.generate_content(
             model=self.model,
-            contents=prompt,
+            contents=contents if images else prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system,
                 response_mime_type="application/json",
@@ -74,7 +75,9 @@ class FakeProvider(Provider):
     def __init__(self, fn: Callable[[str, str, type[BaseModel]], str]):
         self.fn = fn
 
-    def generate(self, system: str, prompt: str, schema: type[BaseModel]) -> str:
+    def generate(self, system: str, prompt: str, schema: type[BaseModel], images=None) -> str:
+        if images:
+            prompt = prompt + "\n[IMAGES] " + " ".join(b[:200].decode("utf-8", "ignore") for b, _ in images)
         return self.fn(system, prompt, schema)
 
 
@@ -110,9 +113,13 @@ def _cache_key(task: str, system: str, prompt: str) -> str:
     return hashlib.sha256(f"{PROMPT_VERSION}|{task}|{system}|{prompt}".encode()).hexdigest()
 
 
-def call_json(db: Session, task: str, system: str, prompt: str, schema: type[T]) -> tuple[T, str]:
-    """Return (validated result, provider label). Raises AIUnavailable or InvalidAIOutput."""
-    key = _cache_key(task, system, prompt)
+def call_json(db: Session, task: str, system: str, prompt: str, schema: type[T], images=None,
+              reverse: bool = False) -> tuple[T, str]:
+    """Return (validated result, provider label). Raises AIUnavailable or InvalidAIOutput.
+    `images` is a list of (bytes, mime type) sent with the prompt; `reverse` asks the backup model first
+    (used for a second opinion)."""
+    img_key = "".join(hashlib.sha256(b).hexdigest() for b, _ in (images or []))
+    key = _cache_key(task, system, prompt + img_key)
     cached = db.get(LLMCache, key)
     if cached:
         try:
@@ -124,12 +131,14 @@ def call_json(db: Session, task: str, system: str, prompt: str, schema: type[T])
     chain = providers()
     if not chain:
         raise AIUnavailable("AI is not configured. Add GEMINI_API_KEY to the backend environment.")
+    if reverse:
+        chain = list(reversed(chain))
 
     errors: list[str] = []
     for provider in chain:
         for attempt in range(2):
             try:
-                raw = provider.generate(system, prompt, schema)
+                raw = provider.generate(system, prompt, schema, images) if images else provider.generate(system, prompt, schema)
                 data = json.loads(raw)
                 result = schema.model_validate(data)
             except (json.JSONDecodeError, ValidationError, InvalidAIOutput) as e:

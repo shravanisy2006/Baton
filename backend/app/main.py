@@ -70,6 +70,7 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 for r in (auth_router, projects_router, sources_router, evidence_router, claims_router, detect_router,

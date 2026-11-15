@@ -34,7 +34,7 @@ def view_handover(project_id: str, s=Depends(current_session), db: Session = Dep
         db.commit()
     content = filter_for_level(v.snapshot, m.level)
     # Living handover: flag lines of this version that newer evidence has since put in doubt.
-    changed = {c.id: (c.changed_note, c.review_state) for c in db.query(Claim).filter(
+    changed = {c.id: (c.changed_note, c.review_state, c.changed_evidence or []) for c in db.query(Claim).filter(
         Claim.project_id == project_id,
         (Claim.changed_note.isnot(None)) | (Claim.review_state.in_(("superseded", "rejected"))))}
     flagged = 0
@@ -42,7 +42,8 @@ def view_handover(project_id: str, s=Depends(current_session), db: Session = Dep
         for item in sec["items"]:
             hit = changed.get(item.get("claim_id") or "")
             if hit:
-                note, state = hit
+                note, state, newer = hit
+                item["newer_evidence"] = [e for e in newer if e.get("access_level", 1) <= m.level]
                 item["changed_since_approval"] = note or (
                     "Replaced by newer evidence; the reviewer will issue an updated handover." if state == "superseded"
                     else "Withdrawn by the reviewer after approval.")
@@ -77,3 +78,19 @@ def acknowledge(version_id: str, body: AckIn, s=Depends(current_session), db: Se
         db.commit()
     acks = {a.section for a in db.query(Acknowledgement).filter_by(version_id=v.id, user_id=m.user.id)}
     return {"acknowledged": sorted(acks)}
+
+
+@router.get("/projects/{project_id}/handover/pdf")
+def handover_pdf(project_id: str, s=Depends(current_session), db: Session = Depends(get_db)):
+    """Download the handover as a PDF file, filtered exactly like the page."""
+    from fastapi.responses import Response
+
+    from .pdf import build_pdf
+
+    data = view_handover(project_id, s, db)
+    pdf = build_pdf(data)
+    import re
+
+    name = re.sub(r"[^A-Za-z0-9]+", "-", data["content"].get("project", "handover"))[:60].strip("-") or "handover"
+    return Response(pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="Handover-{name}-v{data["version"]}.pdf"'})

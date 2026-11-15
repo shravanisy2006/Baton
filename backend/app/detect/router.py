@@ -166,6 +166,7 @@ def resolve_conflict(conflict_id: str, body: ResolveIn, s=Depends(current_sessio
             c = db.get(Claim, cid)
             if c and c.changed_note:
                 c.changed_note = None  # the reviewer checked the newer evidence: this line still stands
+                c.changed_evidence = []
         k.status, k.winner_claim_id = "resolved", body.winner_claim_id
     if note:
         k.resolution_note = ((k.resolution_note + " | ") if k.resolution_note else "") + f"Reviewer: {note}"

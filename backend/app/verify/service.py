@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from rapidfuzz import fuzz
 from sqlalchemy.orm import Session
 
-from ..llm.provider import call_json
+from ..llm.provider import InvalidAIOutput, call_json
 from ..models import LEADS, Claim, Conflict, EvidenceUnit
 
 FUZZY_THRESHOLD = 90
@@ -147,6 +147,19 @@ def gate2(db: Session, claims: list[Claim]) -> list[str]:
                 c.support, c.support_reason = None, "Support check returned no verdict for this claim."
                 warnings.append(f"No support verdict for {c.code}")
     return warnings
+
+
+def second_opinion(db: Session, claim: Claim) -> str:
+    """Re-run the support check for one claim, alone, asking the other model first. Returns the new verdict.
+    Used when the reviewer thinks the first check was too strict; both results stay in the record."""
+    prompt = "Claims to check (second opinion, judge this one on its own):\n\n" + _claim_line(claim)
+    result, model = call_json(db, "support-second-opinion", SUPPORT_SYSTEM, prompt, SupportResult, reverse=True)
+    v = next((x for x in result.verdicts if x.claim_ref.strip().upper() == claim.code.upper()), None)
+    if not v:
+        raise InvalidAIOutput("The second opinion returned no verdict for this claim.")
+    before = claim.support or "none"
+    claim.support, claim.support_reason = v.verdict, f"Second opinion ({model}): {v.reason[:400]} (first check: {before})"
+    return v.verdict
 
 
 def base_confidence(claim: Claim) -> str:

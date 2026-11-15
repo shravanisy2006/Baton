@@ -116,7 +116,7 @@ export interface Source {
   error: string | null;
   unit_count: number;
   redactions: number;
-  coverage: { skipped?: string[]; skipped_count?: number; storage_error?: string };
+  coverage: { skipped?: string[]; skipped_count?: number; storage_error?: string; ocr_pages?: number };
   created_at: string;
 }
 
@@ -232,6 +232,7 @@ export interface HandoverItem {
   review_state?: string;
   change?: "added" | "changed";
   changed_since_approval?: string;
+  newer_evidence?: { code: string; quote: string; source: string; author: string | null; date: string | null; statement: string }[];
   evidence: HandoverEvidence[];
 }
 

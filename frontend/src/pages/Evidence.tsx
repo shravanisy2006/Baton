@@ -18,6 +18,7 @@ export function locationText(e: { location: Record<string, string | number>; kin
   if (l.message) parts.push(`message ${l.message}`);
   if (l.record) parts.push(`record ${l.record}`);
   if (l.question) parts.push("interview answer");
+  if (l.transcribed) parts.push("AI transcription of a scan");
   return parts.join(" · ");
 }
 

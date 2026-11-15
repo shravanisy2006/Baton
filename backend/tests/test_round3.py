@@ -172,6 +172,9 @@ def test_living_handover_update_flags_changes_and_versions(client, demo):
     flagged = [i for s in h["content"]["sections"] for i in s["items"] if i.get("changed_since_approval")]
     assert flagged and h["version"] == 1 and h["update_in_review"]
     assert any("500 rows" in i["text"] for i in flagged)
+    # The newer quote is shown beside the old one, word-for-word and highlighted.
+    newer = next(i for i in flagged if i.get("newer_evidence"))["newer_evidence"][0]
+    assert "done and deployed" in newer["quote"] and newer["text"][newer["start"]:newer["end"]].lower() == newer["quote"].lower()
 
     # Reviewer settles the new conflict in favour of the newer evidence, approves the new claim, issues v2.
     new_conflicts = [k for k in client.get(f"/projects/{pid}/conflicts", headers=tok).json()["conflicts"]
@@ -346,3 +349,118 @@ def test_judge_demo_accounts_and_reset(client):
     assert pid2 != pid and client.get(f"/projects/{pid}", headers=rev).status_code == 404
     ov2 = client.get(f"/projects/{pid2}", headers=rev).json()
     assert ov2["counts"]["new_evidence"] == 0 and ov2["handover"]["approved_version"] == 1
+
+
+# ---------- scanned PDFs and images (OCR) ----------
+
+def _png() -> bytes:
+    import pymupdf
+
+    pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 40, 20), 0)
+    pix.clear_with(255)
+    return pix.tobytes("png")
+
+
+def _scanned_pdf() -> bytes:
+    import pymupdf
+
+    doc = pymupdf.open()
+    for _ in range(2):
+        page = doc.new_page()
+        page.insert_image(page.rect, stream=_png())  # an image only: no text layer, like a scan
+    return doc.tobytes()
+
+
+def test_scans_and_images_are_transcribed(client):
+    rev = signup(client)
+    pid, _ = _project_with_people(client, rev)
+    r = client.post(f"/projects/{pid}/sources/upload", headers=auth(rev), data={"access_label": "Team"},
+                    files=[("files", ("whiteboard.png", _png())), ("files", ("scanned-minutes.pdf", _scanned_pdf()))])
+    res = {x["filename"]: x for x in r.json()["results"]}
+    assert res["whiteboard.png"]["ok"] and res["scanned-minutes.pdf"]["ok"], r.text
+    assert res["scanned-minutes.pdf"]["source"]["coverage"]["ocr_pages"] == 2
+    units = client.get(f"/projects/{pid}/evidence", headers=auth(rev)).json()
+    units = units["evidence"] if isinstance(units, dict) else units
+    ocr = [u for u in units if (u.get("location") or {}).get("transcribed")]
+    assert len(ocr) >= 3 and all("projector" in u["text"] or "whiteboard" in u["text"] for u in ocr)
+
+
+def test_scan_when_ai_is_down_is_reported_not_crashed(client):
+    from app.llm.provider import set_providers_for_tests
+
+    rev = signup(client)
+    pid, _ = _project_with_people(client, rev)
+    set_providers_for_tests([])
+    r = client.post(f"/projects/{pid}/sources/upload", headers=auth(rev), data={"access_label": "Team"},
+                    files=[("files", ("photo.jpg", _png()))]).json()["results"][0]
+    assert not r["ok"] and r["source"]["status"] == "unreadable" and "transcribed" in r["source"]["error"]
+
+
+def test_handover_pdf_is_a_real_file_and_respects_access(client, demo):
+    import pymupdf
+
+    pid = demo["project_id"]
+    _approve_all_resolvable(client, demo)
+    tok = auth(demo["tokens"][REVIEWER])
+    v = client.post(f"/projects/{pid}/handover/generate", headers=tok).json()
+    client.post(f"/handover/{v['id']}/approve", headers=tok)
+    r = client.get(f"/projects/{pid}/handover/pdf", headers=auth(demo["tokens"][NEW]))
+    assert r.status_code == 200 and r.headers["content-type"] == "application/pdf"
+    assert "attachment" in r.headers["content-disposition"]
+    text = "".join(p.get_text() for p in pymupdf.open(stream=r.content, filetype="pdf"))
+    assert "What you own" in text and "Version 1" in text
+    assert "Arjun Rao" not in text  # Restricted contact never reaches a Leads reader, even in the PDF
+    full = "".join(p.get_text() for p in pymupdf.open(stream=client.get(f"/projects/{pid}/handover/pdf", headers=tok).content,
+                                                     filetype="pdf"))
+    assert "Arjun Rao" in full
+    assert client.get(f"/projects/{pid}/handover/pdf").status_code == 401
+
+
+def test_busy_ai_is_retried_and_leftovers_finish_later(client, demo, monkeypatch):
+    """A batch that hits a busy AI is retried; if it still fails, its evidence waits for the next update run."""
+    import app.pipeline as pl
+    from app.llm.provider import AIUnavailable
+
+    pid, tok = demo["project_id"], auth(demo["tokens"][REVIEWER])
+    real = pl.extract_batch
+    calls = {"n": 0}
+
+    def flaky(db, project_id, batch, filenames):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise AIUnavailable("503 UNAVAILABLE: high demand")  # first try busy, retry works
+        return real(db, project_id, batch, filenames)
+
+    monkeypatch.setattr(pl, "extract_batch", flaky)
+    r = client.post(f"/projects/{pid}/sources/upload", headers=tok, data={"access_label": "Team"},
+                    files=[("files", ("standup.md", UPDATE_NOTE))])
+    assert r.status_code == 200
+    client.post(f"/projects/{pid}/analyse", json={}, headers=tok)
+    job = client.get(f"/projects/{pid}", headers=tok).json()["latest_job"]
+    assert job["status"] == "done" and job["stats"]["claims"] == 2 and calls["n"] == 2
+
+    def down(db, project_id, batch, filenames):
+        raise AIUnavailable("429 RESOURCE_EXHAUSTED")
+
+    monkeypatch.setattr(pl, "extract_batch", down)
+    client.post(f"/projects/{pid}/sources/upload", headers=tok, data={"access_label": "Team"},
+                files=[("files", ("standup-2.md", UPDATE_NOTE.replace(b"Standup", b"Second standup")))])
+    client.post(f"/projects/{pid}/analyse", json={}, headers=tok)
+    ov = client.get(f"/projects/{pid}", headers=tok).json()
+    assert ov["latest_job"]["status"] == "failed" and "Nothing was lost" in ov["latest_job"]["error"]
+    assert ov["counts"]["new_evidence"] == 2  # still waiting, nothing half-saved
+
+
+def test_second_opinion_for_an_over_strict_support_check(client, demo):
+    pid, tok = demo["project_id"], auth(demo["tokens"][REVIEWER])
+    claims = claims_of(client, demo)["claims"]
+    strict = next(c for c in claims if c["statement"] == "The registration API has no automated tests.")
+    # This one's quote is real but doesn't support the claim: the first check said "unrelated".
+    detail = client.get(f"/claims/{strict['id']}", headers=tok).json()
+    assert detail["support"] == "unrelated" and detail["confidence"] == "unverified"
+    r = client.post(f"/claims/{strict['id']}/second-opinion", headers=tok)
+    assert r.status_code == 200 and r.json()["support"] == "supports" and "Second opinion" in r.json()["support_reason"]
+    assert client.post(f"/claims/{strict['id']}/second-opinion", headers=tok).status_code == 409  # already agrees
+    invented = next(c for c in claims if c["statement"] == "Payments will resume in November.")
+    assert client.post(f"/claims/{invented['id']}/second-opinion", headers=tok).status_code == 409  # no real quote
+    assert client.post(f"/claims/{strict['id']}/second-opinion", headers=auth(demo["tokens"][NEW])).status_code in (403, 404)

@@ -3,7 +3,7 @@
 Three layers: automated end-to-end tests of the API, scripted browser click-throughs of the main journeys, and manual
 checks with the real Gemini model and on the deployed site.
 
-## 1. Automated tests (24)
+## 1. Automated tests (29)
 
 ```powershell
 cd backend
@@ -15,7 +15,7 @@ stand-in for Gemini (`tests/conftest.py`) that makes deliberate mistakes on purp
 one changed word, a citation of evidence that doesn't exist, and a real quote that doesn't support its claim. Each test
 checks that Baton catches the mistake.
 
-**Last run: 24 passed on SQLite with Python 3.12, 3.13, 3.14 and 3.15, and on PostgreSQL 16.** A Round 2 database was also upgraded in place to the Round 3 schema without data loss (new columns are added at
+**Last run: 29 passed on SQLite with Python 3.12, and on PostgreSQL 16** (the first 24 also on Python 3.13, 3.14 and 3.15). A Round 2 database was also upgraded in place to the Round 3 schema without data loss (new columns are added at
 startup; evidence that was already analysed is marked as such).
 
 ### Core workflow (`tests/test_workflow.py`, 14 tests)
@@ -37,7 +37,7 @@ startup; evidence that was already analysed is marked as such).
 | WhatsApp, Slack, GitHub JSON imports: one unit per message with author and time | `test_chat_and_json_imports` | Pass |
 | A judge's own project from sign-up to the new member's handover | `test_own_project_from_scratch` | Pass |
 
-### Round 3 (`tests/test_round3.py`, 10 tests)
+### Round 3 (`tests/test_round3.py`, 15 tests)
 
 | Scenario | Test | Result |
 | --- | --- | --- |
@@ -51,6 +51,11 @@ startup; evidence that was already analysed is marked as such).
 | Unanswered question → sent to the leaver → answered → the next question is answered from that answer, cited | `test_ask_unanswered_goes_to_leaver_and_comes_back_as_evidence` | Pass |
 | Same action twice (resolve, dismiss, approve, acknowledge, send) and unknown IDs give clean 409/404/422, never a crash | `test_repeated_actions_are_safe` | Pass |
 | Demo accounts: shared project built through the API (approved v1, both people joined); sign in as each; strangers can't reset; reset restores the starting state | `test_judge_demo_accounts_and_reset` | Pass |
+| Scanned PDF and a photo are transcribed into evidence labelled as AI transcriptions; claims cite them with checked quotes | `test_scans_and_images_are_transcribed` | Pass |
+| A scan uploaded while the AI is down is reported clearly, not crashed or half-saved | `test_scan_when_ai_is_down_is_reported_not_crashed` | Pass |
+| Handover PDF is a real PDF file with a proper filename; hidden lines stay hidden; non-members refused | `test_handover_pdf_is_a_real_file_and_respects_access` | Pass |
+| Busy AI: the batch is retried after a wait; if still busy the job says "Nothing was lost", and the next run finishes only the leftovers | `test_busy_ai_is_retried_and_leftovers_finish_later` | Pass |
+| Second opinion: a real quote the first check rejected is re-judged by the other model; refused when the quote isn't real, when it already agrees, or for non-reviewers | `test_second_opinion_for_an_over_strict_support_check` | Pass |
 
 ## 2. Browser click-throughs (Playwright, Chromium)
 
@@ -68,6 +73,7 @@ Run against the built frontend and the API with the scripted AI, as a first-time
 | Worked example | Open the example → analysis → switch Priya / Riya / Karan → gaps → "not shared yet" for Karan before approval | Pass |
 | Bad input and empty states | Invalid invite link, signed-out project link, wrong password, unknown project id, empty Ask history, no handover yet | Pass: clear message and a way out each time |
 | Phone width (iPhone 13) | Sign in, projects, overview with People, Ask Baton | Pass |
+| Round 2 fixes | Demo reviewer → handover → **Download PDF** saves a real `.pdf`; upload a whiteboard photo → "transcribed by AI" note; Review → **Ask the AI again (second opinion)** → Gate 2 updates with the reason | Pass |
 | Errors in the browser console | All journeys above | None |
 
 ## 3. Manual checks with real services
@@ -82,6 +88,6 @@ Run against the built frontend and the API with the scripted AI, as a first-time
 ## Known limits (not bugs)
 
 - Baton does not send email; invite links are copied or sent from the reviewer's own mail app.
-- Gemini's free tier can be busy (503) or rate-limited (429). Baton retries once, falls back to the backup model, and
-  otherwise shows a clear message; nothing is half-saved.
-- Scanned PDFs need OCR, which isn't built yet; they are reported as unreadable.
+- Gemini's free tier can be busy (503) or rate-limited (429). Baton falls back to the backup model, waits and retries the
+  batch once, and otherwise shows a clear message; nothing is half-saved and the next run finishes only what's left.
+- Scans are transcribed by Gemini (up to 8 pages per file); with no AI available they're reported, not read.

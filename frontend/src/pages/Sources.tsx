@@ -62,6 +62,12 @@ export default function SourcesPage() {
                       )}
                     </div>
                     {s.error && <div className="mt-1 text-xs text-rose-700">{s.error}</div>}
+                    {!!s.coverage?.ocr_pages && (
+                      <div className="mt-1 text-xs text-sky-700">
+                        Scanned: {s.coverage.ocr_pages} page{s.coverage.ocr_pages === 1 ? "" : "s"} transcribed by AI. Quotes are checked
+                        against the transcription; compare with the original for important lines.
+                      </div>
+                    )}
                     {!!s.coverage?.skipped_count && (
                       <div className="mt-1 text-xs text-slate-500">
                         Skipped {s.coverage.skipped_count}: {s.coverage.skipped?.slice(0, 2).join("; ")}
@@ -173,13 +179,13 @@ function UploadPanel({ onDone }: { onDone: () => void }) {
           {files.length ? (
             <span className="font-medium text-slate-700">{files.map((f) => f.name).join(", ")}</span>
           ) : (
-            <span className="text-slate-500">Drop files here or click to choose · PDF, DOCX, TXT, MD, CSV, JSON · chat exports (WhatsApp/Slack/Discord) · max 10 MB each</span>
+            <span className="text-slate-500">Drop files here or click to choose · PDF (scanned too), DOCX, TXT, MD, CSV, JSON · chat exports (WhatsApp/Slack/Discord) · photos and screenshots (PNG, JPG) · max 10 MB each</span>
           )}
           <input
             ref={fileRef}
             type="file"
             multiple
-            accept=".pdf,.docx,.txt,.md,.markdown,.csv,.json"
+            accept=".pdf,.docx,.txt,.md,.markdown,.csv,.json,.png,.jpg,.jpeg,.webp"
             className="hidden"
             onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
           />

@@ -163,6 +163,7 @@ class Claim(Base):
     # Living handover: set when evidence that arrived after approval disagrees with or replaces this claim.
     changed_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    changed_evidence: Mapped[list] = mapped_column(JSON, default=list)  # the newer quotes, shown beside the old one
     job_id: Mapped[str | None] = mapped_column(String(24), nullable=True)  # the analysis run that found it
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     citations: Mapped[list["ClaimEvidence"]] = relationship(

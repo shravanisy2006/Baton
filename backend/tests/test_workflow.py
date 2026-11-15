@@ -38,7 +38,7 @@ def test_upload_pdf_docx_csv_and_reject_unsupported(client):
         ("files", ("notes.docx", buf.getvalue(), "application/octet-stream")),
         ("files", ("runbook.pdf", pdf.getvalue(), "application/pdf")),
         ("files", ("tasks.csv", b"Task,Owner,Status\nFix login bug,asha,Done\nAdd dark mode,,To do\n", "text/csv")),
-        ("files", ("photo.png", b"\x89PNG....", "image/png")),
+        ("files", ("setup.exe", b"MZ....", "application/octet-stream")),
         ("files", ("empty.csv", b"Task,Owner\n", "text/csv")),
     ]
     r = client.post(f"/projects/{pid}/sources/upload", files=files, data={"access_label": "Team"}, headers=auth(tok))
@@ -47,7 +47,7 @@ def test_upload_pdf_docx_csv_and_reject_unsupported(client):
     assert res["notes.docx"]["ok"] and res["notes.docx"]["source"]["unit_count"] >= 1
     assert res["runbook.pdf"]["ok"] and res["runbook.pdf"]["source"]["unit_count"] == 1
     assert res["tasks.csv"]["source"]["unit_count"] == 2
-    assert not res["photo.png"]["ok"] and "Unsupported" in res["photo.png"]["error"]
+    assert not res["setup.exe"]["ok"] and "Unsupported" in res["setup.exe"]["error"]
     assert not res["empty.csv"]["ok"] and res["empty.csv"]["source"]["status"] == "failed"
     ev = client.get(f"/projects/{pid}/evidence", headers=auth(tok)).json()["evidence"]
     row = next(e for e in ev if e["kind"] == "csv_row" and "Fix login bug" in e["text"])

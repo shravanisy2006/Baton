@@ -35,12 +35,13 @@ is filtered out in the database query, never just hidden in the UI.
 | GET | `/samples.zip` | The synthetic sample project files, to try uploading. |
 | GET | `/projects/{project_id}/jobs/latest` | Status, stage, stats and warnings of the latest analysis. |
 | GET | `/projects/{project_id}/sources` | Sources at or below your access level, plus a count of hidden ones. |
-| POST | `/projects/{project_id}/sources/upload` | Multipart upload of PDF/DOCX/TXT/MD/CSV/JSON files and chat exports with an access_label. Parses into evidence units immediately. |
+| POST | `/projects/{project_id}/sources/upload` | Multipart upload of PDF/DOCX/TXT/MD/CSV/JSON files, chat exports and images (PNG/JPG/WEBP) with an access_label. Parses into evidence units immediately; scanned PDF pages and images are transcribed by Gemini (`coverage.ocr_pages`). |
 | POST | `/projects/{project_id}/sources/github` | Import issues, PRs, comments and commits from a GitHub repo via the REST API. Token (optional) is never stored. |
 | GET | `/projects/{project_id}/evidence` | Evidence units (filter: source_id, q). Access label filter is applied in SQL. |
 | GET | `/evidence/{evidence_id}` | One evidence unit, if your access level allows it. |
 | GET | `/projects/{project_id}/claims` | Claims with gate 1/gate 2 results and confidence (filters: type, confidence, review_state, q). |
 | GET | `/claims/{claim_id}` | Claim detail: citations with match type, score, highlight offsets, evidence text, reviews, conflicts. |
+| POST | `/claims/{claim_id}/second-opinion` | Reviewer: re-run the support check for one claim with the other model, judged on its own. Only for claims with a word-for-word quote that the first check didn't accept. 409 otherwise; 503 if the AI is busy. |
 | POST | `/claims/{claim_id}/review` | Reviewer: approve / reject / edit (→ corrected) / reassign / reset. Unverified claims need a reason and become Reviewer-asserted. |
 | GET | `/projects/{project_id}/gaps` | Gaps and interview questions. |
 | POST | `/gaps/{gap_id}/answer` | Departing member (and reviewers, for questions asked through Ask Baton): answer. Stored as separate attested evidence, labelled with who answered. |
@@ -51,6 +52,7 @@ is filtered out in the database query, never just hidden in the UI.
 | POST | `/handover/{version_id}/approve` | Reviewer: approve a draft. Only approved versions are visible to incoming members and viewers. Acknowledgements carry over for sections that didn't change. |
 | GET | `/projects/{project_id}/handover/versions` | Reviewer: version history. |
 | GET | `/projects/{project_id}/handover` | Role-aware handover, re-filtered by the reader's access level on every request, with the diff and any lines "changed since approval". |
+| GET | `/projects/{project_id}/handover/pdf` | The handover as a generated PDF file (`Handover-<project>-v<n>.pdf`), filtered by the reader's access level like the page. |
 | POST | `/handover/{version_id}/ack` | Incoming member: acknowledge a section. |
 | GET | `/projects/{project_id}/audit` | Reviewer/admin: append-only audit log. |
 | GET | `/health` | Liveness check and AI configuration status. |

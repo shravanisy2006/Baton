@@ -1,10 +1,10 @@
 import { AlertTriangle, CheckCircle2, Download, ExternalLink, FileCheck2, GitCompare, Lock, Send, ShieldCheck, Sparkles } from "lucide-react";
-import { useState } from "react";
-import { api, ApiError } from "../lib/api";
+import { Fragment, useState } from "react";
+import { api, ApiError, downloadFile } from "../lib/api";
 import { useApi } from "../lib/hooks";
 import { ROLE_LABEL, useProject } from "../lib/session";
 import type { Evidence, Handover, HandoverDiff, HandoverEvidence, HandoverItem } from "../lib/types";
-import { Button, Card, ConfidenceBadge, Drawer, Empty, ErrorBox, Highlighted, LabelBadge, Notice, PageHeader, Pill, Spinner } from "../components/ui";
+import { Button, Card, ConfidenceBadge, cx, Drawer, Empty, ErrorBox, Highlighted, LabelBadge, Notice, PageHeader, Pill, Spinner } from "../components/ui";
 import { locationText } from "./Evidence";
 
 export default function HandoverPage() {
@@ -56,7 +56,11 @@ export default function HandoverPage() {
               </Button>
             )}
             {d && (
-              <Button variant="secondary" onClick={() => window.print()}>
+              <Button
+                variant="secondary"
+                loading={busy === "pdf"}
+                onClick={() => run("pdf", () => downloadFile(`/projects/${pid}/handover/pdf`, "handover.pdf"))}
+              >
                 <Download className="h-4 w-4" /> Download PDF
               </Button>
             )}
@@ -166,6 +170,29 @@ export default function HandoverPage() {
   );
 }
 
+function QuoteBox({
+  label,
+  q,
+  newer,
+}: {
+  label: string;
+  q?: { code: string; quote: string; source: string; author: string | null; date: string | null };
+  newer?: boolean;
+}) {
+  if (!q) return null;
+  return (
+    <div className={cx("rounded border bg-white p-2", newer ? "border-sky-200" : "border-slate-200")}>
+      <div className={cx("text-[11px] font-semibold uppercase tracking-wide", newer ? "text-sky-700" : "text-slate-500")}>{label}</div>
+      <p className="mt-1 text-xs italic text-slate-800">“{q.quote}”</p>
+      <p className="mt-1 text-[11px] text-slate-500">
+        <span className="font-mono">{q.code}</span> · {q.source}
+        {q.author ? ` · ${q.author}` : ""}
+        {q.date ? ` · ${q.date}` : ""}
+      </p>
+    </div>
+  );
+}
+
 function DiffPanel({ diff, version, sections }: { diff: HandoverDiff; version: number; sections: { key: string; title: string }[] }) {
   const titles = Object.fromEntries(sections.map((s) => [s.key, s.title]));
   const entries = Object.entries(diff.sections ?? {});
@@ -178,34 +205,44 @@ function DiffPanel({ diff, version, sections }: { diff: HandoverDiff; version: n
         Version {version} compared line by line with the last approved version.
         {diff.hidden ? ` ${diff.hidden} change(s) in sources above your access level are not shown.` : ""}
       </p>
-      <div className="mt-3 space-y-3">
-        {entries.map(([key, part]) => (
-          <div key={key}>
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{titles[key] ?? key}</div>
-            <ul className="mt-1 space-y-1 text-sm">
-              {part.added.map((x, i) => (
-                <li key={"a" + i} className="flex gap-2">
-                  <span className="font-mono text-emerald-600">+</span>
-                  <span className="text-slate-800">{x.text}</span>
-                </li>
-              ))}
-              {part.changed.map((x, i) => (
-                <li key={"c" + i} className="flex gap-2">
-                  <span className="font-mono text-sky-600">~</span>
-                  <span className="text-slate-800">
-                    {x.after} <span className="text-xs text-slate-400">(was: {x.before})</span>
-                  </span>
-                </li>
-              ))}
-              {part.removed.map((x, i) => (
-                <li key={"r" + i} className="flex gap-2">
-                  <span className="font-mono text-rose-600">−</span>
-                  <span className="text-slate-500 line-through">{x.text}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full min-w-[520px] border-collapse text-sm">
+          <thead>
+            <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
+              <th className="w-1/2 border-b border-slate-200 py-1.5 pr-3">Version {diff.base_version} (approved)</th>
+              <th className="w-1/2 border-b border-slate-200 py-1.5 pl-3">Version {version}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map(([key, part]) => (
+              <Fragment key={key}>
+                <tr>
+                  <td colSpan={2} className="pt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {titles[key] ?? key}
+                  </td>
+                </tr>
+                {part.removed.map((x, i) => (
+                  <tr key={"r" + i} className="align-top">
+                    <td className="border-b border-slate-100 bg-rose-50/60 py-1.5 pr-3 text-slate-500 line-through">{x.text}</td>
+                    <td className="border-b border-slate-100 py-1.5 pl-3 text-xs italic text-slate-400">removed</td>
+                  </tr>
+                ))}
+                {part.changed.map((x, i) => (
+                  <tr key={"c" + i} className="align-top">
+                    <td className="border-b border-slate-100 bg-amber-50/60 py-1.5 pr-3 text-slate-600">{x.before}</td>
+                    <td className="border-b border-slate-100 bg-sky-50/60 py-1.5 pl-3 text-slate-900">{x.after}</td>
+                  </tr>
+                ))}
+                {part.added.map((x, i) => (
+                  <tr key={"a" + i} className="align-top">
+                    <td className="border-b border-slate-100 py-1.5 pr-3 text-xs italic text-slate-400">not in version {diff.base_version}</td>
+                    <td className="border-b border-slate-100 bg-emerald-50/60 py-1.5 pl-3 text-slate-900">{x.text}</td>
+                  </tr>
+                ))}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
       </div>
     </Card>
   );
@@ -246,12 +283,24 @@ function Item({ it, onOpen }: { it: HandoverItem; onOpen: (i: HandoverItem) => v
         }
       >
         {it.changed_since_approval && (
-          <p className="mb-2 flex items-start gap-1.5 rounded bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>
-              <b>Changed since approval.</b> {it.changed_since_approval}
-            </span>
-          </p>
+          <div className="mb-2 rounded bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
+            <p className="flex items-start gap-1.5">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                <b>Changed since approval.</b> {it.changed_since_approval}
+              </span>
+            </p>
+            {!!it.newer_evidence?.length && (
+              <div className="mt-2 grid gap-2 sm:grid-cols-2" onClick={(e) => e.stopPropagation()}>
+                <QuoteBox label="Approved line was based on" q={it.evidence[0] && { ...it.evidence[0] }} />
+                <div className="space-y-2">
+                  {it.newer_evidence.map((n, i) => (
+                    <QuoteBox key={i} label="Newer evidence says" q={n} newer />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
         <div className="flex flex-wrap items-start gap-2">
           <p className="flex-1 text-sm font-medium text-slate-900">{it.action ?? it.text}</p>

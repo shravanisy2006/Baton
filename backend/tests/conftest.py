@@ -10,7 +10,8 @@ os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///
 os.environ["LOCAL_STORAGE_DIR"] = f"{_tmp}/storage"
 os.environ["GEMINI_API_KEY"] = ""
 os.environ["BATON_SKIP_DEMO_CACHE"] = "1"
-os.environ["BATON_SKIP_JUDGE_DEMO"] = "1"  # built explicitly in its own test  # tests use the scripted AI, not the saved real answers
+os.environ["BATON_SKIP_JUDGE_DEMO"] = "1"
+os.environ["BATON_BUSY_WAIT_SECONDS"] = "0"  # built explicitly in its own test  # tests use the scripted AI, not the saved real answers
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytest  # noqa: E402
@@ -105,6 +106,9 @@ def fake_extract(prompt: str) -> dict:
 
 
 def fake_support(prompt: str) -> dict:
+    if "second opinion" in prompt:  # the other model, asked alone, agrees
+        return {"verdicts": [{"claim_ref": m.group(1), "verdict": "supports", "reason": "scripted second opinion"}
+                             for m in re.finditer(r"^(C-\d+) \[", prompt, re.M)]}
     verdicts = []
     for m in re.finditer(r"^(C-\d+) \[(\w+)\] (.*?)$", prompt, re.M):
         code, statement = m.group(1), m.group(3)
@@ -140,7 +144,15 @@ def fake_ask(prompt: str) -> dict:
     return {"answerable": False, "answer": "", "citations": []}
 
 
+def fake_ocr(prompt: str) -> dict:
+    pages = [int(n) for n in re.findall(r"(\d+)", prompt.split("The images are pages", 1)[1].split("in that order")[0])]
+    return {"pages": [{"page": n, "text": f"Scanned whiteboard, page {n}\n\nThe venue projector is booked through the AV club."}
+                      for n in pages]}
+
+
 def fake_llm(system: str, prompt: str, schema) -> str:
+    if schema.__name__ == "Transcription":
+        return json.dumps(fake_ocr(prompt))
     if schema.__name__ == "AskResult":
         return json.dumps(fake_ask(prompt))
     if schema.__name__ == "ExtractionResult":

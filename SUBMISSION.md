@@ -18,7 +18,7 @@
 
 **Connect**
 
-7. Upload PDF, DOCX, TXT, Markdown, CSV, JSON (GitHub / Slack / Discord / any records) and WhatsApp chat exports.
+7. Upload PDF, DOCX, TXT, Markdown, CSV, JSON (GitHub / Slack / Discord / any records) and WhatsApp chat exports; scanned PDFs and photos/screenshots are transcribed by Gemini (labelled as transcriptions).
 8. Read-only GitHub import (issues, pull requests, comments, commits) and GitHub re-sync that adds only new or changed items.
 9. Team / Leads / Restricted label on every source; secret and phone-number redaction; coverage report; downloadable sample project.
 
@@ -27,7 +27,7 @@
 10. Numbered evidence units with source, author, date/time and location (page, row, section, message).
 11. Gemini claim extraction into 9 types with strict JSON validated by Pydantic; retry once, then reject; backup model; response cache.
 12. Gate 1: word-for-word quote check in code (altered or invented quotes rejected, offsets saved for highlighting).
-13. Gate 2: a separate AI support check.
+13. Gate 2: a separate AI support check, with a reviewer-requested second opinion from the other model when it looks too strict.
 14. Confidence labels: Verified, Corroborated, Weak, Conflicting, Unverified, Leaver-attested, Reviewer-asserted.
 15. Status and owner conflicts, one per topic, with every source on each side and the newer side marked.
 16. Timeline check for decisions replaced by newer evidence.
@@ -38,14 +38,14 @@
 18. Review: approve, approve with a reason, reject, correct, reassign owner, undo; conflicts block approval.
 19. 8-section handover built only from approved claims, with draft and approved versions.
 20. Evidence drawer on every line (quote highlighted in its source, author, date, location, access, verification).
-21. Per-section acknowledgement; download as PDF; access re-checked on every read; hidden items counted, never shown.
+21. Per-section acknowledgement; a generated PDF file download; access re-checked on every read; hidden items counted, never shown.
 
 **Living handover (Round 3)**
 
 22. Update runs: only new evidence is analysed; every earlier review decision is kept.
 23. "Check for changes": re-sync GitHub, then analyse what's new (or say clearly that nothing is new).
-24. Approved lines contradicted or replaced by newer evidence are flagged "Changed since approval" for everyone, including the new member.
-25. Version N+1 with a "What changed since version N" diff (added, updated, removed lines), filtered by access level.
+24. Approved lines contradicted or replaced by newer evidence are flagged "Changed since approval" for everyone, including the new member, with the newer quote shown beside the one the approved line was based on.
+25. Version N+1 with a side-by-side "What changed since version N" diff (version N | version N+1: added, updated, removed lines), filtered by access level.
 26. Acknowledgements carry over for unchanged sections; the new member re-reads only what changed.
 27. "Start over" (full re-analysis) keeps the approved handover visible until a new one is approved.
 
@@ -63,12 +63,13 @@
 34. Append-only audit log: uploads, analyses, review decisions, invites, joins, removals, approvals, views, acknowledgements, questions.
 35. Ready-made demo accounts for judges (reviewer, leaver, new member) on a shared project that is already analysed, reviewed and handed over, with one-click sign-in, a downloadable newer file to test the living handover, and a reset button.
 36. Works on phone width; clear messages for expired links, wrong passwords, missing projects, busy AI and a sleeping server.
+37. Busy AI handling: backup model, then a wait-and-retry per batch; if still busy, "nothing was lost" and the next run finishes only the leftovers.
 
 ## 2. Technical architecture and implementation summary
 
 **Stack.** React 18 + TypeScript + Vite + Tailwind (Vercel) · FastAPI + Pydantic 2 + SQLAlchemy 2.1 (Render) · Supabase
 Postgres with Row-Level Security on all 18 tables · Google Gemini 3.8 Flash with Gemini 3.5 Flash-Lite as backup
-(`google-genai`, JSON schema output) · PyMuPDF, python-docx, pandas, RapidFuzz · GitHub REST API · PyJWT + scrypt ·
+(`google-genai`, JSON schema output) · PyMuPDF, python-docx, pandas, RapidFuzz, reportlab · GitHub REST API · PyJWT + scrypt ·
 pytest + Playwright.
 
 **How it fits together.** The browser talks only to the API with a signed session token. Uploads are parsed, redacted and
@@ -95,7 +96,7 @@ lets Gemini draft a cited answer, and keeps only quotes that pass the same word-
 
 | Committed in Round 2 | Delivered |
 | --- | --- |
-| 1. **Living handover**: re-sync after approval, flag changed lines, reviewed version 2 with a diff, re-acknowledge only changed sections | Yes: update runs, GitHub re-sync, "Changed since approval" flags, version diff panel, acknowledgement carry-over |
+| 1. **Living handover**: re-sync after approval, flag changed lines, reviewed version 2 with a diff, re-acknowledge only changed sections | Yes: update runs, GitHub re-sync, "Changed since approval" flags with the newer quote beside the old one, side-by-side version diff, acknowledgement carry-over |
 | 2. **Ask Baton**: questions answered only with checked quotes; unanswerable questions go to the leaver as gaps; answers become evidence | Yes: retrieval filtered by access, cited answers with highlights, refusal when unsupported, routing to the leaver/reviewer, answers cited next time |
 | 3. **Real team accounts with invite links**: each person signs in to their own account; per-account roles and access; real names in the audit log; revocable access | Yes: sign up / sign in, one-time invite links, join with own account, remove access, previews logged as previews |
 
@@ -106,7 +107,18 @@ have split permission checks across two places. Invite links are copied or sent 
 email delivery is first on the roadmap.
 
 **Other improvements after Round 2**
-- Re-running analysis no longer resets review decisions (it was our main "known issue" in Round 2).
+Every "known issue" we listed in Round 2 was worked on:
+
+| Round 2 known issue | Now |
+| --- | --- |
+| No real login; workspace tied to one browser | Real accounts; sign in from any device |
+| Re-running analysis resets review decisions | Update runs keep every decision; "Start over" is a separate, explicit choice |
+| No OCR for scanned PDFs | Scanned pages and images are transcribed by Gemini, labelled, and quote-checked like any text |
+| Gate 2 sometimes rejects correct claims | Reviewer can ask the other model for a second opinion on that claim; the first verdict stays in the record |
+| PDF only through the browser print dialog | A generated PDF file downloads directly |
+| Gemini busy / rate-limited | Backup model, then wait and retry the batch; clear "nothing was lost" message; next run finishes only leftovers |
+| Free server wakes slowly | Home page waits and explains; UptimeRobot keeps it awake; demo accounts are ready instantly |
+| Private GitHub repos need a token | Works as intended: paste a read-only GitHub token when importing a private repo (it is used for that import only); public repos need nothing |
 - Workspaces are no longer tied to one browser: sign in from any device.
 - Repeated actions (double clicks, resolving twice, accepting an invite twice) return clear messages instead of side effects.
 - Clearer errors and a way out on every failure screen; passive tips never pull users away from the page they chose.
@@ -117,10 +129,11 @@ email delivery is first on the roadmap.
 
 ## 4. Testing details
 
-- **24 automated end-to-end tests** (`backend/tests`), passing on SQLite with Python 3.12, 3.13, 3.14 and 3.15 and on
+- **29 automated end-to-end tests** (`backend/tests`), passing on SQLite with Python 3.12, 3.13, 3.14 and 3.15 and on
   PostgreSQL 16. They use a scripted AI that makes deliberate mistakes (invented quote, one changed word, missing evidence,
-  unsupported claim) and check Baton catches each one. Ten new tests cover accounts, invites, previews, removal, the
-  living handover, GitHub re-sync, Ask Baton, routing to the leaver, repeated/bad actions, and the demo accounts with reset.
+  unsupported claim) and check Baton catches each one. Fifteen new tests cover accounts, invites, previews, removal, the
+  living handover, GitHub re-sync, Ask Baton, routing to the leaver, repeated/bad actions, the demo accounts with reset,
+  scans/images, the generated PDF, busy-AI retry and the second opinion.
 - **Browser click-throughs** (Playwright): a first-time reviewer's whole journey, the invite accepted in a second browser,
   preview mode, Ask Baton, the living-handover update to version 2, page refresh, the worked example, error states, and
   phone width — with zero browser console errors.
@@ -130,7 +143,7 @@ email delivery is first on the roadmap.
 
 ## 5. Product roadmap
 
-Next 3 months: email delivery and change notifications, scheduled GitHub checks, OCR for scans, Google Drive and Notion
+Next 3 months: email delivery and change notifications, scheduled GitHub checks, offline OCR fallback, Google Drive and Notion
 connectors, password reset, and a labelled evaluation set to measure claim accuracy per model.
 3–6 months: hybrid retrieval for Ask Baton, Slack/Teams connectors, handover templates, reviewer bulk tools, ownership map.
 6–12 months: organisations and SSO, automatic handovers on exit, private deployment with open-weight models, analytics.

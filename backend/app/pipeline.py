@@ -8,6 +8,8 @@ Two modes:
   "Changed since approval", so the reviewer can decide and issue a new handover version.
 """
 import logging
+import os
+import time
 from datetime import datetime, timezone
 
 from .audit.service import log as audit
@@ -19,6 +21,7 @@ from .models import APPROVED_STATES, Claim, Conflict, EvidenceUnit, Gap, Handove
 from .verify.service import base_confidence, gate1, gate2, refresh_confidence, valid_citations
 
 log = logging.getLogger("baton.pipeline")
+BUSY_WAIT_SECONDS = float(os.environ.get("BATON_BUSY_WAIT_SECONDS", "20"))
 
 
 def _stage(db, job: Job, stage: str) -> None:
@@ -69,7 +72,15 @@ def run_analysis(project_id: str, job_id: str, actor_id: str | None = None) -> N
         analysed: list[EvidenceUnit] = []
         for n, batch in enumerate(batches, start=1):
             try:
-                claims += extract_batch(db, project_id, batch, filenames)
+                try:
+                    found = extract_batch(db, project_id, batch, filenames)
+                except AIUnavailable:
+                    # Gemini's free tier is often briefly overloaded: wait, then try this batch once more.
+                    _stage(db, job, f"AI busy, retrying batch {n} of {len(batches)}")
+                    time.sleep(BUSY_WAIT_SECONDS)
+                    _stage(db, job, "extracting claims")
+                    found = extract_batch(db, project_id, batch, filenames)
+                claims += found
                 analysed += batch
             except InvalidAIOutput as e:
                 warnings.append(f"Batch {n} of {len(batches)} ({batch[0].code}–{batch[-1].code}) was not analysed: "
@@ -77,7 +88,9 @@ def run_analysis(project_id: str, job_id: str, actor_id: str | None = None) -> N
             except AIUnavailable as e:
                 if not claims and n == 1:
                     raise
-                warnings.append(f"Batch {n} of {len(batches)} ({batch[0].code}–{batch[-1].code}) was not analysed: {e}")
+                warnings.append(f"Batch {n} of {len(batches)} ({batch[0].code}–{batch[-1].code}) was not analysed because "
+                                f"the AI was busy; those pieces stay waiting, so 'Analyse new evidence' finishes them "
+                                f"later without redoing the rest. ({str(e)[:120]})")
         for c in claims:
             c.job_id = job.id
         db.commit()
@@ -121,6 +134,13 @@ def run_analysis(project_id: str, job_id: str, actor_id: str | None = None) -> N
                         what = "may be replaced by newer evidence" if k.kind == "superseded" else "is contradicted by newer evidence"
                         c.changed_note = f"This approved line {what}: {k.explanation[:400]}"
                         c.changed_at = now
+                        newer = [by_id[x] for x in k.side_a + k.side_b if x in new_ids and x in by_id]
+                        c.changed_evidence = [
+                            {"code": x.evidence.code, "quote": x.quote, "source": filenames.get(x.evidence.source_id, ""),
+                             "author": x.evidence.author, "date": x.evidence.occurred_at, "text": x.evidence.text,
+                             "start": x.start, "end": x.end, "access_level": x.evidence.access_label,
+                             "statement": n.statement}
+                            for n in newer for x in n.citations if x.match == "exact" and x.evidence][:4]
                         affected.append(c)
         for c in claims + affected:
             refresh_confidence(db, c)
@@ -156,7 +176,9 @@ def run_analysis(project_id: str, job_id: str, actor_id: str | None = None) -> N
         db.rollback()
         job = db.get(Job, job_id)
         job.status = "failed"
-        job.error = str(e)[:1000]
+        job.error = (("The AI (Gemini) is busy or over its free limit right now, even after retrying. Nothing was "
+                      "lost: wait a minute and run the analysis again. Details: ") if isinstance(e, AIUnavailable)
+                     else "") + str(e)[:900]
         job.finished_at = datetime.now(timezone.utc)
         audit(db, project_id, actor, "analysis.failed", "job", job.id, error=str(e)[:300])
         db.commit()

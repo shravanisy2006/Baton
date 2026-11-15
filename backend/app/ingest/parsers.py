@@ -36,6 +36,8 @@ class ParsedSource:
     occurred_at: str | None = None
     skipped: list[str] = field(default_factory=list)
     unreadable: bool = False
+    # Scanned pages / images to transcribe with AI: (page number, image bytes, mime type)
+    needs_ocr: list[tuple[int, bytes, str]] = field(default_factory=list)
 
 
 class ParseError(Exception):
@@ -43,7 +45,9 @@ class ParseError(Exception):
 
 
 SUPPORTED = {".pdf": "pdf", ".docx": "docx", ".txt": "txt", ".md": "md", ".markdown": "md", ".csv": "csv",
-             ".json": "json"}
+             ".json": "json", ".png": "image", ".jpg": "image", ".jpeg": "image", ".webp": "image"}
+IMAGE_MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
+MAX_OCR_PAGES = 8
 
 
 def kind_for(filename: str) -> str | None:
@@ -170,7 +174,11 @@ def parse_pdf(data: bytes, filename: str) -> ParsedSource:
         blocks = [b[4] for b in page.get_text("blocks") if b[6] == 0 and b[4].strip()]
         if not blocks:
             empty_pages += 1
-            out.skipped.append(f"page {page_no}: no readable text (scanned image?)")
+            if len(out.needs_ocr) < MAX_OCR_PAGES:
+                pix = page.get_pixmap(dpi=150)
+                out.needs_ocr.append((page_no, pix.tobytes("png"), "image/png"))
+            else:
+                out.skipped.append(f"page {page_no}: scanned page beyond the first {MAX_OCR_PAGES} (not transcribed)")
             continue
         lines: list[str] = []
         for i, block in enumerate(blocks):
@@ -248,9 +256,14 @@ def parse_csv(data: bytes, filename: str) -> ParsedSource:
 def parse_file(data: bytes, filename: str) -> tuple[str, ParsedSource]:
     kind = kind_for(filename)
     if not kind:
-        raise ParseError("Unsupported file type. Use PDF, DOCX, TXT, MD, CSV or JSON.")
+        raise ParseError("Unsupported file type. Use PDF, DOCX, TXT, MD, CSV, JSON, or an image (PNG, JPG, WEBP).")
     if not data:
         raise ParseError("The file is empty.")
+    if kind == "image":
+        ext = "." + filename.lower().rsplit(".", 1)[-1]
+        out = ParsedSource(occurred_at=_date_from_name(filename))
+        out.needs_ocr.append((1, data, IMAGE_MIME.get(ext, "image/png")))
+        return kind, out
     if kind == "pdf":
         return kind, parse_pdf(data, filename)
     if kind == "docx":

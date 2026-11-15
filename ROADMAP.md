@@ -19,7 +19,7 @@ Everything below builds on that, in the order that most improves trust and reach
 | --- | --- |
 | **Email delivery** for invites and "your handover changed" notices (Resend / SMTP), with per-user preferences | Today links are copied or sent from the reviewer's own mail app |
 | **Scheduled checks**: re-sync GitHub nightly and notify the reviewer when approved lines change | The living handover shouldn't depend on someone pressing a button |
-| **OCR** for scanned PDFs and screenshots (Tesseract or a vision model), still followed by the word-for-word check | Many college and small-team records are scans |
+| **Offline OCR** (Tesseract) as a fallback when Gemini is busy, and longer scans than 8 pages (shipped in Round 3: Gemini transcription of scans and images) | Scans should never wait on one AI service |
 | **Google Drive and Notion connectors** (read-only, OAuth), with the same access labels | Fewer manual uploads |
 | **Password reset and email verification**; optional Google sign-in | Basic account hygiene |
 | **Evaluation set**: 3 synthetic projects with hand-labelled ground truth; report claim precision/recall, quote-rejection rate and conflict accuracy per model | Measure quality instead of asserting it; compare models before switching |

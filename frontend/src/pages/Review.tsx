@@ -1,4 +1,4 @@
-import { Check, ClipboardCheck, Pencil, RotateCcw, UserCog, X } from "lucide-react";
+import { Check, ClipboardCheck, Pencil, RefreshCw, RotateCcw, UserCog, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
@@ -139,7 +139,22 @@ function ReviewPanel({ id, onDone }: { id: string; onDone: () => void }) {
     }
   }
 
+  async function secondOpinion() {
+    setBusy(true);
+    setErr(null);
+    try {
+      const r = await api.post<Claim>(`/claims/${id}/second-opinion`, {});
+      setData(r);
+      onDone();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const unverified = c.confidence === "unverified";
+  const canRecheck = c.support !== "supports" && c.citations.some((x) => x.match === "exact");
   const blocked = c.confidence === "conflicting" && c.conflicts?.some((k) => k.status === "open");
 
   return (
@@ -158,6 +173,15 @@ function ReviewPanel({ id, onDone }: { id: string; onDone: () => void }) {
           {unverified && (
             <Notice tone="warn">
               This claim failed verification. You can reject it, or approve it only as <b>Reviewer-asserted</b> with a reason.
+            </Notice>
+          )}
+          {canRecheck && (
+            <Notice tone="info">
+              The quote was found word for word, but the AI check said it doesn't back the claim. If you think the check was
+              too strict, ask the other AI model to judge it on its own.{" "}
+              <Button size="sm" variant="secondary" onClick={secondOpinion} loading={busy && !mode} className="ml-1 mt-1">
+                <RefreshCw className="h-3.5 w-3.5" /> Ask the AI again (second opinion)
+              </Button>
             </Notice>
           )}
           <div className="flex flex-wrap gap-2" data-guide="review-actions">

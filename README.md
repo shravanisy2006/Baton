@@ -78,7 +78,8 @@ leaving, Karan is taking over, Priya reviews. Switch between them with **Viewing
 
 **Connect**
 1. Upload PDF, DOCX, TXT, Markdown, CSV, JSON (GitHub, Slack, Discord, any list of records) and WhatsApp chat exports;
-   import a public GitHub repo (issues, PRs, comments, commits) read-only.
+   import a public GitHub repo (issues, PRs, comments, commits) read-only. **Scanned PDFs and photos/screenshots**
+   (PNG, JPG, WEBP) are transcribed by Gemini and labelled "AI transcription of a scan", then checked like any text.
 2. Access label on every source (Team / Leads / Restricted); secret and phone-number redaction; a coverage report.
 
 **Reconstruct and verify**
@@ -87,7 +88,8 @@ leaving, Karan is taking over, Priya reviews. Switch between them with **Viewing
 4. Gemini extracts 9 claim types as strict JSON validated by Pydantic; invalid output is retried once, then rejected.
 5. **Gate 1 (code):** every quote must appear word for word in the cited evidence. **Gate 2 (separate AI check):** the
    quote must support the claim. Labels instead of fake percentages: Verified, Corroborated, Weak, Conflicting,
-   Unverified, Leaver-attested, Reviewer-asserted.
+   Unverified, Leaver-attested, Reviewer-asserted. If the support check looks too strict, a reviewer can ask the
+   other model for a **second opinion** on that one claim (the quote must still match word for word).
 6. Conflicts (status, owner) grouped one per topic; a timeline check for reversed decisions; gaps (missing owner or
    reason, open questions, unreadable files) become questions for the person leaving.
 
@@ -95,15 +97,15 @@ leaving, Karan is taking over, Priya reviews. Switch between them with **Viewing
 
 7. Approve, approve with a reason, reject, correct, reassign owner, undo. Nothing reaches the new member unapproved.
 8. 8-section handover (what you own, next actions, unfinished work, decisions and why, risks, dependencies, open
-   questions, contacts), with an evidence drawer on every line, per-section acknowledgement and PDF download.
+   questions, contacts), with an evidence drawer on every line, per-section acknowledgement and a **generated PDF download** (a real file, no print dialog).
 
 **Round 3**
 
 9. **Real team accounts:** sign up / sign in (passwords stored as salted scrypt hashes), one-time invite links (14 days,
    stored as hashes, revocable), joining with your own account, removing access, previews clearly logged.
 10. **Living handover:** update runs read only new evidence and keep every decision; GitHub re-sync adds only new or
-    changed items; approved lines contradicted by newer evidence are flagged *Changed since approval*; version N+1 shows
-    a line-by-line diff; acknowledgements carry over for unchanged sections.
+    changed items; approved lines contradicted by newer evidence are flagged *Changed since approval*, with the newer
+    quote beside the old one; version N+1 shows a side-by-side diff; acknowledgements carry over for unchanged sections.
 11. **Ask Baton:** questions answered only from evidence the asker may see, every quote checked word for word; if the
     files can't answer, Baton says so and the question can go to the leaver (or reviewer), whose answer becomes labelled
     evidence for the next person.
@@ -143,7 +145,7 @@ leaving, Karan is taking over, Priya reviews. Switch between them with **Viewing
 | Backend | Python 3.12+, FastAPI, Pydantic 2, SQLAlchemy 2.1, Uvicorn |
 | Database | Supabase Postgres (psycopg 3, Session pooler); SQLite locally |
 | AI | Google Gemini via `google-genai`, structured JSON output |
-| Parsing / matching | PyMuPDF, python-docx, pandas, RapidFuzz |
+| Parsing / matching / PDF | PyMuPDF, python-docx, pandas, RapidFuzz, reportlab |
 | Auth | PyJWT sessions, scrypt password hashes (Python standard library), hashed one-time invite tokens |
 | Integrations | GitHub REST API (read-only) |
 | Tests | pytest (24 end-to-end tests with a scripted AI), Playwright browser click-throughs |
@@ -217,10 +219,12 @@ Roadmap: [ROADMAP.md](ROADMAP.md).
 ## Honest notes
 
 - No email is sent by Baton: invite links are copied, or sent from your own mail app with one click.
-- Analysing your own files and Ask Baton call Gemini live. If Gemini is busy, Baton says so and **Re-run / Ask again**
-  works a minute later. The worked example's analysis uses saved answers.
+- Analysing your own files and Ask Baton call Gemini live. If Gemini is busy, Baton tries the backup model, waits and
+  retries the batch once, and otherwise says so in plain words; nothing is lost and **Re-run / Ask again** finishes only
+  what's left. The worked example's analysis uses saved answers.
 - The free Render server sleeps after ~15 minutes idle; the first visit can take up to a minute while it wakes.
-- Scanned (image-only) PDFs aren't read (no OCR yet); they are reported as unreadable. Max 10 MB per file.
+- Scans are read by Gemini (up to 8 pages per file), so a very messy scan can be transcribed imperfectly; every quote
+  from it is still checked word for word against the transcription, and it is labelled as a transcription. Max 10 MB per file.
 - The worked example is synthetic; its GitHub export is a file, while live GitHub import works with any public repo.
 - Disclosure: we used an AI coding assistant (Claude) while building. Inside the product, Gemini only proposes claims and
   answers; code checks them and people approve them.
