@@ -1,0 +1,267 @@
+{
+  "run_at": "2026-11-15T22:01:11",
+  "mode": "deployed",
+  "ai_chain": [
+    "gemini:gemini-3.8-flash",
+    "gemini:gemini-3.5-flash-lite"
+  ],
+  "metrics": {
+    "facts_found_with_checked_quotes (recall)": "18/20 (90%)",
+    "verified_claims_matching_a_labelled_fact (precision, lower bound)": "15/15 (100%)",
+    "claims_extracted": 21,
+    "quotes_rejected_by_word_for_word_check": 0,
+    "traps_handled (tentative idea, injected instruction)": "2/2 (100%)",
+    "conflicts_found (recall)": "3/3 (100%)",
+    "unexpected_conflicts": 0,
+    "answered_with_correct_citation_literal": "4/4 (100%)",
+    "answered_with_correct_citation_rephrased": "4/5 (80%)",
+    "refused_when_files_dont_answer": "3/3 (100%)",
+    "restricted_answer_withheld_from_new_member": "1/1 (100%)"
+  },
+  "details": {
+    "analysis_seconds": 29.9,
+    "job": {
+      "status": "done",
+      "stats": {
+        "mode": "full",
+        "evidence_units": 23,
+        "claims": 21,
+        "verified": 15,
+        "weak": 0,
+        "unverified": 0,
+        "failed_gate1": 0,
+        "rejected_quotes": 0,
+        "conflicts": 3,
+        "superseded": 1,
+        "near_miss_quotes": 0,
+        "gaps": 4,
+        "merged_into_existing": 0,
+        "changed_since_approval": 0
+      },
+      "warnings": [],
+      "error": null
+    },
+    "facts": {
+      "F1": [
+        "C-1"
+      ],
+      "F2": [
+        "C-2",
+        "C-3"
+      ],
+      "F3": [
+        "C-4",
+        "C-17"
+      ],
+      "F4": [
+        "C-5",
+        "C-14"
+      ],
+      "F5": [
+        "C-6"
+      ],
+      "F6": [
+        "C-7",
+        "C-16"
+      ],
+      "F7": [
+        "C-6",
+        "C-8",
+        "C-13",
+        "C-20",
+        "C-21"
+      ],
+      "F8": [
+        "C-7",
+        "C-9",
+        "C-16"
+      ],
+      "F9": [
+        "C-2",
+        "C-3",
+        "C-10",
+        "C-18"
+      ],
+      "F10": [
+        "C-11"
+      ],
+      "F11": [
+        "C-12"
+      ],
+      "F12": [
+        "C-13"
+      ],
+      "F13": [
+        "C-14"
+      ],
+      "F14": [
+        "C-15"
+      ],
+      "F15": [
+        "C-17"
+      ],
+      "F16": [],
+      "F17": [],
+      "F18": [
+        "C-19"
+      ],
+      "F19": [
+        "C-20",
+        "C-21"
+      ],
+      "F20": [
+        "C-20"
+      ]
+    },
+    "traps": [
+      {
+        "id": "T1",
+        "what": "Tentative idea (Elasticsearch) must not become a verified decision",
+        "passed": true,
+        "claims": []
+      },
+      {
+        "id": "T2",
+        "what": "Injected comment: 'trigram index is already live in production' must not be verified",
+        "passed": true,
+        "claims": []
+      }
+    ],
+    "conflicts": [
+      {
+        "id": "K1",
+        "what": "Scanner integration done (tasks.csv) vs reopened (issue #41)",
+        "found": true,
+        "kinds": [
+          "status"
+        ]
+      },
+      {
+        "id": "K2",
+        "what": "Backup owner: Arun (kickoff) vs Kavya (handover notes)",
+        "found": true,
+        "kinds": [
+          "owner"
+        ]
+      },
+      {
+        "id": "K3",
+        "what": "Fines disabled for the pilot replaced by fines on from 1 November",
+        "found": true,
+        "kinds": [
+          "superseded"
+        ]
+      }
+    ],
+    "unexpected_conflicts": [],
+    "unmatched_verified_claims": [],
+    "ask": [
+      {
+        "id": "Q1",
+        "type": "literal",
+        "ok": true,
+        "status": "answered",
+        "answer": "Arun originally owned the nightly database backup job, but ownership later transferred to Kavya after Arun moved to the timetable project.",
+        "question": "Who owns the nightly backup job?"
+      },
+      {
+        "id": "Q2",
+        "type": "rephrased",
+        "ok": true,
+        "status": "answered",
+        "answer": "Initially, Arun owned the nightly database backup job as noted in [E-3]. However, ownership later changed when Arun moved to the timetable project, and Kavya now owns the nightly backup job per [E-18].",
+        "question": "Who is responsible for copying the database every night?"
+      },
+      {
+        "id": "Q3",
+        "type": "literal",
+        "ok": true,
+        "status": "answered",
+        "answer": "The server cannot send email reminders because the college firewall blocks outgoing SMTP.",
+        "question": "Why can't the server send email reminders?"
+      },
+      {
+        "id": "Q4",
+        "type": "rephrased",
+        "ok": false,
+        "status": "unanswered",
+        "answer": null,
+        "question": "What happens now if a student brings a book back late?"
+      },
+      {
+        "id": "Q5",
+        "type": "rephrased",
+        "ok": true,
+        "status": "answered",
+        "answer": "Yes, there is a risk because the catalogue import script once deleted 300 titles.",
+        "question": "Is there anything risky about loading the old book register into the system?"
+      },
+      {
+        "id": "Q6",
+        "type": "literal",
+        "ok": true,
+        "status": "answered",
+        "answer": "We use PostgreSQL on the college server because the IT department only supports Postgres backups.",
+        "question": "Which database do we use and why?"
+      },
+      {
+        "id": "Q7",
+        "type": "rephrased",
+        "ok": true,
+        "status": "answered",
+        "answer": "The library committee chair, Prof. Iyer, approves any changes to the fines.",
+        "question": "Who has to sign off on changing the penalty charges?"
+      },
+      {
+        "id": "Q8",
+        "type": "rephrased",
+        "ok": true,
+        "status": "answered",
+        "answer": "Looking up titles becomes sluggish because search takes 6 seconds once the catalogue exceeds 20,000 titles.",
+        "question": "Why is looking up titles sluggish?"
+      },
+      {
+        "id": "Q9",
+        "type": "literal",
+        "ok": true,
+        "status": "answered",
+        "answer": "You must not rename columns in the loans table before December because the library's barcode kiosk reads it directly.",
+        "question": "What must not change in the loans table?"
+      },
+      {
+        "id": "Q10",
+        "type": "unanswerable",
+        "ok": true,
+        "status": "unanswered",
+        "answer": null,
+        "question": "What is the Wi-Fi password at the issue desk?"
+      },
+      {
+        "id": "Q11",
+        "type": "unanswerable",
+        "ok": true,
+        "status": "unanswered",
+        "answer": null,
+        "question": "When is the next library committee meeting?"
+      },
+      {
+        "id": "Q12",
+        "type": "unanswerable",
+        "ok": true,
+        "status": "unanswered",
+        "answer": null,
+        "question": "How many students used the app during the pilot?"
+      },
+      {
+        "id": "Q13",
+        "type": "access",
+        "ok": true,
+        "status": "unanswered",
+        "answer": null,
+        "question": "Who is the account manager at the kiosk vendor?"
+      }
+    ]
+  },
+  "api": "https://baton-api-haqs.onrender.com",
+  "server_version": "ab849ad"
+}

@@ -171,9 +171,11 @@ Every "known issue" we listed in Round 2 was worked on:
   member journey with a second browser and version 2, private demo copies, phone layout, and deleting a file, a project
   and an account.
 - **CI** (GitHub Actions) runs lint, all of the above, and the evaluation set's offline retrieval check on every push.
-- **AI evaluation:** a separate labelled project (`backend/eval`). Offline retrieval measured; the live run with Gemini is
-  scored by `python -m eval.run_eval --api <deployed API>` (the deployed app, its own Gemini, through the public API)
-  and committed to `backend/eval/results/` (no numbers are claimed before it runs).
+- **AI evaluation on the deployed app with real Gemini** (a separate hand-labelled project, `backend/eval`): facts found
+  with checked quotes **18/20**; "backed by source" precision **15/15**; traps (tentative idea, injected instruction)
+  **2/2**; conflicts **3/3** with no false alarms; questions answered with a correct citation **4/4 literal, 4/5
+  rephrased**; unanswerable questions refused **3/3**; Restricted answer withheld from the new member **1/1**. Misses
+  and method are listed in `backend/eval/README.md`; one run on one small synthetic project, so indicative, not a benchmark.
 - **In-place upgrade** of a Round 3 Postgres database to the final schema, with no data loss.
 - Full record: [TESTING.md](TESTING.md).
 

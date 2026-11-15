@@ -48,5 +48,26 @@ be checked by hand).
 The previous (Round 3) retrieval scored the same on this data (4/4, 3/5, 4/5): the stemming added in the final
 pass doesn't change these questions. Since then, Ask Baton shows the AI all permitted evidence when it fits (this
 project does), so the evidence the AI sees contains the answer for every answerable question: literal 4/4,
-rephrased 5/5 (offline, 15 Nov 2026). Whether the AI then answers correctly is only measured in a live run.
-**Live results: not yet run** — run `--api` against the deployed app, or the local run with the team's key.
+rephrased 5/5 (offline, 15 Nov 2026).
+
+### Live run on the deployed app
+
+| Measure (deployed app, Gemini 3.8 Flash + Flash-Lite backup, 15 Nov 2026, server `ab849ad`) | Result |
+| --- | --- |
+| Labelled facts found, each with a word-for-word checked quote (recall) | **18 / 20** |
+| "Backed by source" findings that match a labelled fact (precision, lower bound) | **15 / 15** |
+| Traps handled (a tentative idea and an injected instruction never became backed facts) | **2 / 2** |
+| Conflicts found (status worded differently, owner change, reversed decision) | **3 / 3**, 0 false alarms |
+| Literal questions answered with a correct citation | **4 / 4** |
+| Rephrased questions (no words in common with the answer) answered with a correct citation | **4 / 5** |
+| Questions the files can't answer: refused instead of guessed | **3 / 3** |
+| Restricted answer withheld from the new member | **1 / 1** |
+| Quotes rejected by the word-for-word check | 0 of 21 findings |
+| Analysis time for 23 evidence pieces | 30 s |
+
+What it missed, honestly: two facts (a planned SMS gateway for reminders, and "run the catalogue import with
+`--dry-run` first") were not extracted; and one rephrased question ("What happens now if a student brings a book back
+late?") was declined — answering it needs two notes combined (fines off for the pilot, then on from 1 November), and the
+model said the files don't answer rather than guess. One run on one small synthetic project: Gemini's output varies
+between runs, so treat these as indicative, not a benchmark. Full detail (every finding, conflict and answer):
+`backend/eval/results/20261115-2223-deployed.json`.

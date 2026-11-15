@@ -66,7 +66,7 @@ def main() -> None:
         import httpx
 
         base = args.api.rstrip("/")
-        c = httpx.Client(base_url=base, timeout=180)
+        c = RetryingClient(httpx.Client(base_url=base, timeout=180))
         print(f"Waking up {base} (a sleeping free server can take a minute)...")
         for _ in range(12):
             try:
@@ -103,6 +103,41 @@ def main() -> None:
     _write(report)
 
 
+class RetryingClient:
+    """An httpx client for the deployed app that rides out a free server dropping connections or restarting:
+    on a network error or a 502/503/504 it waits and tries again (up to ~3 minutes) instead of giving up.
+    Analyses are resumable on the server (the job queue picks them up after a restart), so waiting is safe."""
+
+    def __init__(self, client, tries: int = 12, wait: float = 15.0):
+        self.c, self.tries, self.wait = client, tries, wait
+
+    def _call(self, method: str, url: str, **kw):
+        import httpx
+
+        for attempt in range(1, self.tries + 1):
+            try:
+                r = self.c.request(method, url, **kw)
+                if r.status_code not in (502, 503, 504) or attempt == self.tries:
+                    return r
+                why = f"HTTP {r.status_code}"
+            except httpx.TransportError as e:
+                if attempt == self.tries:
+                    raise
+                why = type(e).__name__
+            print(f"  server not answering ({why}) on {method} {url.split('?')[0]}; waiting {self.wait:.0f} s and retrying...")
+            time.sleep(self.wait)
+        raise RuntimeError("unreachable")
+
+    def get(self, url: str, **kw):
+        return self._call("GET", url, **kw)
+
+    def post(self, url: str, **kw):
+        return self._call("POST", url, **kw)
+
+    def close(self) -> None:
+        self.c.close()
+
+
 def _new_report(mode: str, chain: list[str]) -> dict:
     return {
         "run_at": datetime.now().isoformat(timespec="seconds"),
@@ -117,10 +152,10 @@ def _run(c, truth: dict, report: dict, args, local: bool) -> None:
     """The evaluation itself. `c` is a FastAPI TestClient (local copy) or an httpx client (deployed app): both
     speak the same HTTP API, so the deployed run goes through exactly what a user's browser does."""
     password = "evaluation-pass-1"
-    signup = c.post(
-        "/auth/signup",
-        json={"name": "Dr. Sen", "email": f"eval-{int(time.time())}@example.com", "password": password},
-    )
+    email = f"eval-{int(time.time())}@example.com"
+    signup = c.post("/auth/signup", json={"name": "Dr. Sen", "email": email, "password": password})
+    if signup.status_code == 409:  # the first attempt got through but its answer was lost: just sign in
+        signup = c.post("/auth/signin", json={"email": email, "password": password})
     if signup.status_code != 200:
         sys.exit(f"Sign-up failed ({signup.status_code}): {signup.text[:200]}")
     tok = signup.json()["token"]
@@ -134,6 +169,7 @@ def _run(c, truth: dict, report: dict, args, local: bool) -> None:
             "incoming": {"name": "Nikhil Rao", "handle": "nikhil-r", "access_level": "Leads"},
         },
     ).json()["id"]
+    print(f"Signed up as {email}; uploading the evaluation files...")
     for fname, label in truth["labels"].items():
         r = c.post(
             f"/projects/{pid}/sources/upload",
@@ -150,9 +186,12 @@ def _run(c, truth: dict, report: dict, args, local: bool) -> None:
     try:
         _analysis_and_ask(c, h, pid, truth, report, args)
     finally:
-        if not local:  # leave nothing behind on the deployed app
-            c.post(f"/projects/{pid}/delete", headers=h, json={"confirm_name": "Campus Library app (evaluation)"})
-            c.post("/auth/delete-account", headers=h, json={"password": password})
+        if not local:  # leave nothing behind on the deployed app (deleting the account deletes its projects too)
+            try:
+                c.post("/auth/delete-account", headers=h, json={"password": password})
+                print("Removed the evaluation account and its project from the deployed app.")
+            except Exception as e:  # noqa: BLE001
+                print(f"Could not remove the evaluation account ({email}): {e}. Delete it from the Account page.")
 
 
 def _retrieval(c, pid: str, truth: dict, report: dict, args) -> None:

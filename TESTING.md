@@ -8,7 +8,7 @@ Five layers, all in the repository and run by CI (`.github/workflows/ci.yml`) on
 | Component tests (Vitest + Testing Library) | `frontend/src/test` | 17 | **17 passed** |
 | Browser journeys (Playwright, real frontend + real API, scripted AI) | `frontend/e2e` | 5 | **5 passed** |
 | Lint and format | ruff (backend), ESLint + Prettier + `tsc` (frontend) | — | clean |
-| AI evaluation on a labelled project | `backend/eval` | 20 facts, 2 traps, 3 conflicts, 13 questions | offline retrieval measured; live run needs the Gemini key (see below) |
+| AI evaluation on a labelled project (live, deployed app, real Gemini) | `backend/eval` | 20 facts, 2 traps, 3 conflicts, 13 questions | facts 18/20 · precision 15/15 · traps 2/2 · conflicts 3/3 · answers 4/4 literal, 4/5 rephrased · refusals 3/3 · access 1/1 |
 
 Backend line coverage: **88%** (`pytest --cov=app`).
 
@@ -98,10 +98,29 @@ was created and the data was kept.
 
 ## AI evaluation (`backend/eval`)
 
-See [backend/eval/README.md](backend/eval/README.md). Measured so far (offline, no AI): correct evidence in the top 3 for
-4/4 literal and 3/5 rephrased questions. The live run (facts recall, verified precision, traps, conflicts, Ask Baton
-answers and refusals) needs real Gemini: `python -m eval.run_eval --api https://baton-api-haqs.onrender.com` runs it against the deployed app (no key needed on your machine), or `python -m eval.run_eval` with the key locally; its results are committed to
-`backend/eval/results/` when run. **No live numbers are claimed until then.**
+Method: [backend/eval/README.md](backend/eval/README.md). Run against the deployed app with
+`python -m eval.run_eval --api https://baton-api-haqs.onrender.com` (the server's own Gemini, through the public API;
+the throw-away account and project are deleted afterwards).
+
+| Measure (deployed app, Gemini 3.8 Flash + Flash-Lite backup, 15 Nov 2026, server `ab849ad`) | Result |
+| --- | --- |
+| Labelled facts found, each with a word-for-word checked quote (recall) | **18 / 20** |
+| "Backed by source" findings that match a labelled fact (precision, lower bound) | **15 / 15** |
+| Traps handled (a tentative idea and an injected instruction never became backed facts) | **2 / 2** |
+| Conflicts found (status worded differently, owner change, reversed decision) | **3 / 3**, 0 false alarms |
+| Literal questions answered with a correct citation | **4 / 4** |
+| Rephrased questions (no words in common with the answer) answered with a correct citation | **4 / 5** |
+| Questions the files can't answer: refused instead of guessed | **3 / 3** |
+| Restricted answer withheld from the new member | **1 / 1** |
+| Quotes rejected by the word-for-word check | 0 of 21 findings |
+| Analysis time for 23 evidence pieces | 30 s |
+
+What it missed, honestly: two facts (a planned SMS gateway for reminders, and "run the catalogue import with
+`--dry-run` first") were not extracted; and one rephrased question ("What happens now if a student brings a book back
+late?") was declined — answering it needs two notes combined (fines off for the pilot, then on from 1 November), and the
+model said the files don't answer rather than guess. One run on one small synthetic project: Gemini's output varies
+between runs, so treat these as indicative, not a benchmark. Full detail (every finding, conflict and answer):
+`backend/eval/results/20261115-2223-deployed.json`.
 
 ## Measured performance fixes
 
