@@ -4,7 +4,7 @@ Five layers, all in the repository and run by CI (`.github/workflows/ci.yml`) on
 
 | Layer | Where | Count | Last result |
 | --- | --- | --- | --- |
-| API tests (end to end through the HTTP API, scripted AI) | `backend/tests` | 51 | **51 passed** on SQLite (Python 3.12 and 3.15) and on PostgreSQL 16 |
+| API tests (end to end through the HTTP API, scripted AI) | `backend/tests` | 54 | **54 passed** on SQLite and on PostgreSQL 16 |
 | Component tests (Vitest + Testing Library) | `frontend/src/test` | 17 | **17 passed** |
 | Browser journeys (Playwright, real frontend + real API, scripted AI) | `frontend/e2e` | 5 | **5 passed** |
 | Lint and format | ruff (backend), ESLint + Prettier + `tsc` (frontend) | — | clean |
@@ -51,13 +51,13 @@ different copy, can't open the first one's, and their upload doesn't change it; 
 the old one) · old demo copies cleaned up after 24 h · scans and photos transcribed · scan while the AI is down is
 reported · generated PDF respects access · busy AI retried, leftovers finished later · second opinion.
 
-### Security, privacy, reliability (`test_hardening.py`, 18)
+### Security, privacy, reliability (`test_hardening.py`, 20)
 
 | Scenario | Test |
 | --- | --- |
 | 8 wrong passwords from one network block only that network for that email; the real person elsewhere signs in | `test_failed_signins_cannot_lock_out_someone_else` |
-| Nobody can lock the published demo sign-ins | `test_demo_signins_cannot_be_locked_by_others` |
-| Demo copies (12/h) and sign-ups (10/h) limited per network; other networks unaffected | `test_anonymous_creation_is_rate_limited` |
+| Nobody can lock the published demo sign-ins, even from the same shared network (a judging room behind one address) | `test_demo_signins_cannot_be_locked_by_others` |
+| Demo copies (40/h) and sign-ups (30/h) limited per network, enough for a room of judges; other networks unaffected | `test_anonymous_creation_is_rate_limited` |
 | Password change signs out other devices; wrong current password refused; sign out everywhere ends this session too | `test_sign_out_everywhere_and_password_change_revoke_old_sessions` |
 | The API refuses to start on Render with the development secret | `test_production_refuses_the_development_secret` |
 | CORS allows only configured origins (an arbitrary `*.vercel.app` is refused) | `test_cors_allows_only_configured_origins` |
@@ -71,11 +71,14 @@ reported · generated PDF respects access · busy AI retried, leftovers finished
 | Email configured (mock Resend): invite emailed; link locked to the address; confirmation required; single-use; provider failure recorded as `failed`; password reset by email | `test_invite_email_lock_and_delivery` |
 | Worker thread runs a queued job; a job interrupted by a restart is resumed and its partial results removed | `test_worker_thread_runs_queued_jobs_and_resumes_after_restart` |
 | `/health` reports database, AI, email and job queue | `test_health_reports_database_and_jobs` |
+| Every response has a request reference and security headers; `/health` shows the deployed version | `test_responses_carry_reference_security_headers_and_version` |
+| A server error shows a reference the user can quote; logs carry it, and one-time tokens in URLs are masked | `test_server_errors_give_a_reference_and_logs_mask_tokens` |
 | A Round 3 database (migration 0001, with two users sharing an email) upgrades to head; oldest keeps the address; re-running is a no-op | `test_migrations_upgrade_a_round3_database_without_data_loss` |
 | The old shared judge project and demo-address accounts are removed; an old guest workspace with real work is kept | `test_old_shared_demo_is_removed_but_real_work_is_kept` |
 
-### AI guardrails (`test_ai_quality.py`, 4)
+### AI guardrails (`test_ai_quality.py`, 5)
 Stemmed retrieval and AI keywords (a question sharing no words with the answer finds it only with the keywords) ·
+small projects: the AI is shown all evidence the asker may see and nothing above their level; large ones use search ·
 a rephrased question answered with a checked quote · differently worded subjects produce a conflict only after topic
 grouping, and subject names the AI invents are ignored · invalid JSON retried then accepted; schema-invalid output
 rejected.
@@ -97,7 +100,7 @@ was created and the data was kept.
 
 See [backend/eval/README.md](backend/eval/README.md). Measured so far (offline, no AI): correct evidence in the top 3 for
 4/4 literal and 3/5 rephrased questions. The live run (facts recall, verified precision, traps, conflicts, Ask Baton
-answers and refusals) needs the Gemini key and is run with `python -m eval.run_eval`; its results are committed to
+answers and refusals) needs real Gemini: `python -m eval.run_eval --api https://baton-api-haqs.onrender.com` runs it against the deployed app (no key needed on your machine), or `python -m eval.run_eval` with the key locally; its results are committed to
 `backend/eval/results/` when run. **No live numbers are claimed until then.**
 
 ## Measured performance fixes

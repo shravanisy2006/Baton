@@ -12,7 +12,7 @@ import {
   Search,
   Send,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useApi } from "../lib/hooks";
@@ -23,16 +23,18 @@ import Logo from "./Logo";
 import Guide from "./Guide";
 import AccountMenu from "./AccountMenu";
 
+// The main path first, in the order the work happens; the detail views (raw evidence, every finding, the log)
+// sit in a smaller group so first-time users see six steps, not nine pages.
 const NAV = [
-  { to: "", label: "Overview", icon: LayoutDashboard, need: "any" },
-  { to: "sources", label: "Sources", icon: FileStack, need: "working" },
-  { to: "evidence", label: "Evidence", icon: Search, need: "working" },
-  { to: "claims", label: "Findings", icon: ListChecks, need: "working" },
-  { to: "gaps", label: "Questions", icon: GitCompareArrows, need: "working" },
-  { to: "review", label: "Review", icon: ClipboardCheck, need: "review" },
-  { to: "handover", label: "Handover", icon: Send, need: "any" },
-  { to: "ask", label: "Ask Baton", icon: MessageCircleQuestion, need: "any" },
-  { to: "audit", label: "Audit Log", icon: ScrollText, need: "review" },
+  { to: "", label: "Overview", icon: LayoutDashboard, need: "any", group: "main" },
+  { to: "sources", label: "Sources", icon: FileStack, need: "working", group: "main" },
+  { to: "gaps", label: "Questions", icon: GitCompareArrows, need: "working", group: "main" },
+  { to: "review", label: "Review", icon: ClipboardCheck, need: "review", group: "main" },
+  { to: "handover", label: "Handover", icon: Send, need: "any", group: "main" },
+  { to: "ask", label: "Ask Baton", icon: MessageCircleQuestion, need: "any", group: "main" },
+  { to: "evidence", label: "Evidence", icon: Search, need: "working", group: "details" },
+  { to: "claims", label: "Findings", icon: ListChecks, need: "working", group: "details" },
+  { to: "audit", label: "Audit Log", icon: ScrollText, need: "review", group: "details" },
 ] as const;
 
 export default function Layout() {
@@ -109,23 +111,27 @@ export default function Layout() {
           </Link>
         </div>
         <nav className={cx("flex-col gap-1 px-3 pb-3 lg:flex", menuOpen ? "flex" : "hidden")} aria-label="Project">
-          {NAV.filter((n) => allowed(n.need)).map((n) => (
-            <NavLink
-              key={n.to}
-              to={`/p/${pid}${n.to ? "/" + n.to : ""}`}
-              end={n.to === ""}
-              data-guide={`nav-${n.to || "overview"}`}
-              onClick={() => setMenuOpen(false)}
-              className={({ isActive }) =>
-                cx(
-                  "flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition",
-                  isActive ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-100",
-                )
-              }
-            >
-              <n.icon className="h-4 w-4" />
-              {n.label}
-            </NavLink>
+          {NAV.filter((n) => allowed(n.need)).map((n, i, shown) => (
+            <Fragment key={n.to}>
+              {n.group === "details" && shown[i - 1]?.group !== "details" && (
+                <div className="mt-3 px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Details</div>
+              )}
+              <NavLink
+                to={`/p/${pid}${n.to ? "/" + n.to : ""}`}
+                end={n.to === ""}
+                data-guide={`nav-${n.to || "overview"}`}
+                onClick={() => setMenuOpen(false)}
+                className={({ isActive }) =>
+                  cx(
+                    "flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition",
+                    isActive ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-100",
+                  )
+                }
+              >
+                <n.icon className="h-4 w-4" />
+                {n.label}
+              </NavLink>
+            </Fragment>
           ))}
         </nav>
         {data && (

@@ -1,10 +1,15 @@
 """Baton API. Run locally with:  uvicorn app.main:app --reload  (from the backend folder)."""
 
 import logging
+import os
+import re
+import time
+import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from .ask.router import router as ask_router
@@ -24,6 +29,15 @@ from .verify.router import router as claims_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("baton")
+# The deployed commit (Render sets RENDER_GIT_COMMIT), shown by /health so anyone can check what is live.
+VERSION = (os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("BATON_VERSION") or "dev")[:7]
+_SECRETISH = re.compile(r"/[A-Za-z0-9_-]{20,}")  # invite / reset / confirmation tokens in URLs
+SLOW_REQUEST_SECONDS = 5.0
+
+
+def safe_path(path: str) -> str:
+    """The request path with one-time tokens masked, so logs never contain a usable link."""
+    return _SECRETISH.sub("/[token]", path)
 
 
 @asynccontextmanager
@@ -51,6 +65,7 @@ app = FastAPI(
     version="1.0.0",
     description="Evidence-first project handovers: Connect → Reconstruct → Verify → Review → Handover.",
 )
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().cors_origins,  # exact addresses only (CORS_ORIGINS); no wildcards
@@ -76,6 +91,25 @@ for r in (
     app.include_router(r)
 
 
+@app.middleware("http")
+async def request_context(request: Request, call_next):
+    """A short reference for every request (returned as X-Request-ID and shown in server-error messages), basic
+    security headers, and a log line for errors and slow requests. Tokens in paths are masked in logs."""
+    ref = uuid.uuid4().hex[:8]
+    request.state.ref = ref
+    start = time.perf_counter()
+    response = await call_next(request)
+    took = time.perf_counter() - start
+    response.headers["X-Request-ID"] = ref
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers.setdefault("Cache-Control", "no-store")  # responses are personal: never cache them
+    if response.status_code >= 500 or took > SLOW_REQUEST_SECONDS:
+        log.warning("ref=%s %s %s -> %s in %.1fs", ref, request.method, safe_path(request.url.path), response.status_code, took)
+    return response
+
+
 @app.get("/health", tags=["system"])
 def health():
     """Liveness and readiness: database reachable, AI configured, job workers running."""
@@ -93,6 +127,7 @@ def health():
     s = get_settings()
     body = {
         "ok": db_ok,
+        "version": VERSION,
         "database": db_ok,
         "ai": ai_status(),
         "email": s.email_configured,
@@ -103,5 +138,10 @@ def health():
 
 @app.exception_handler(Exception)
 async def unhandled(request: Request, exc: Exception):
-    log.exception("Unhandled error on %s %s", request.method, request.url.path)
-    return JSONResponse(status_code=500, content={"detail": "Something went wrong on the server. Please try again."})
+    ref = getattr(request.state, "ref", uuid.uuid4().hex[:8])
+    log.exception("ref=%s unhandled error on %s %s", ref, request.method, safe_path(request.url.path))
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Something went wrong on the server. Please try again. (Reference: {ref})", "reference": ref},
+        headers={"X-Request-ID": ref},
+    )

@@ -3,6 +3,7 @@ import path from "node:path";
 import { nav, SEED, SEED_FILES, signUp, upload, UPDATE_NOTE, uniqueEmail, watchErrors } from "./helpers";
 
 test("reviewer hands over a project; the new member joins, asks, and sees version 2", async ({ page, browser }) => {
+  test.setTimeout(240_000); // the longest journey; the first run also waits for the dev server to compile pages
   const noErrors = watchErrors(page);
   await signUp(page, "Dr. Mehra", uniqueEmail("mehra"), "reviewer-pass-1");
 
@@ -34,6 +35,11 @@ test("reviewer hands over a project; the new member joins, asks, and sees versio
     await page.waitForTimeout(500);
   }
   await nav(page, "review");
+  await expect(page.getByTestId("review-progress")).toContainText("findings decided");
+  // Approve everything backed by its source in one go (two clicks), then decide the rest one by one.
+  await page.locator('[data-guide="approve-backed"]').click();
+  await page.getByRole("button", { name: /^Yes, approve \d+/ }).click();
+  await expect(page.locator('[data-guide="approve-backed"]')).toHaveCount(0);
   for (let i = 0; i < 40; i++) {
     const actions = page.locator('[data-guide="review-actions"]');
     await actions.waitFor({ timeout: 5_000 }).catch(() => undefined);

@@ -150,3 +150,55 @@ def test_ai_output_is_validated_retried_then_rejected(client):
     set_providers_for_tests([FakeProvider(lambda s, p, sc: json.dumps({"claims": [{"type": "invented-type"}]}))])
     with SessionLocal() as db, pytest.raises(InvalidAIOutput):
         call_json(db, "extract", "sys", "prompt unique 2", ExtractionResult)
+
+
+def test_ask_shows_all_permitted_evidence_when_it_fits_and_never_more(client, monkeypatch):
+    """Small projects: the AI sees ALL evidence the asker may see (so a rephrased question can't miss), never
+    evidence above their level. Large projects: ranked search with AI keywords."""
+    import app.ask.router as ask_router
+
+    rev = signup(client, "Dr. Rao")
+    pid = client.post(
+        "/projects",
+        json={"name": "Shop app", "incoming": {"name": "Nikhil", "access_level": "Team"}},
+        headers=auth(rev),
+    ).json()["id"]
+    up = f"/projects/{pid}/sources/upload"
+    client.post(
+        up,
+        headers=auth(rev),
+        data={"access_label": "Team"},
+        files=[("files", ("notes.md", b"# Notes\n\nThe projector is booked through the AV club.\n"))],
+    )
+    client.post(
+        up,
+        headers=auth(rev),
+        data={"access_label": "Restricted"},
+        files=[("files", ("sponsor.md", b"# Sponsor\n\nThe sponsor contact is Mr. Kapoor, budget 2 lakh.\n"))],
+    )
+    prompts, plans = [], []
+
+    def scripted(system, prompt, schema):
+        if schema.__name__ == "SearchPlan":
+            plans.append(prompt)
+            return json.dumps({"keywords": ["projector"]})
+        prompts.append(prompt)
+        return json.dumps({"answerable": False, "answer": "", "citations": []})
+
+    set_providers_for_tests([FakeProvider(scripted)])
+    members = client.get(f"/projects/{pid}/members", headers=auth(rev)).json()["members"]
+    nikhil = next(x for x in members if x["role"] == "incoming")
+    as_new = client.post("/auth/act-as", json={"user_id": nikhil["user_id"]}, headers=auth(rev)).json()["token"]
+
+    # Shares no words with either file: retrieval alone would find nothing, but everything permitted is shown.
+    r = client.post(f"/projects/{pid}/ask", headers=auth(as_new), json={"question": "Which club handles our AV gear?"})
+    assert r.status_code == 200
+    assert "projector" in prompts[-1] and "Kapoor" not in prompts[-1]  # Team evidence in, Restricted never
+    assert not plans  # no keyword step needed
+    client.post(f"/projects/{pid}/ask", headers=auth(rev), json={"question": "Who is the sponsor contact?"})
+    assert "Kapoor" in prompts[-1]  # the admin may see Restricted
+
+    # Over the budget: ranked search with AI keywords, still filtered by level.
+    monkeypatch.setattr(ask_router, "FULL_CONTEXT_CHARS", 10)
+    client.post(f"/projects/{pid}/ask", headers=auth(as_new), json={"question": "Which club handles the projector?"})
+    assert plans and "Kapoor" not in prompts[-1] and "projector" in prompts[-1]

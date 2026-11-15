@@ -1,4 +1,4 @@
-import { Check, ClipboardCheck, Pencil, RefreshCw, RotateCcw, UserCog, X } from "lucide-react";
+import { Check, CheckCheck, ClipboardCheck, Pencil, RefreshCw, RotateCcw, UserCog, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
@@ -38,6 +38,43 @@ export default function ReviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list.data, tab]);
 
+  const all = list.data?.claims ?? [];
+  const decided = all.filter((c) => c.review_state !== "pending").length;
+  // Findings a reviewer can safely approve in one go: backed by their source and not part of a disagreement.
+  const easy = all.filter(
+    (c) => c.review_state === "pending" && (c.confidence === "verified" || c.confidence === "corroborated"),
+  );
+  const [bulk, setBulk] = useState<"idle" | "confirm" | "working">("idle");
+  const [bulkErr, setBulkErr] = useState<string | null>(null);
+
+  async function approveEasy() {
+    setBulk("working");
+    setBulkErr(null);
+    try {
+      for (const c of easy) await api.post(`/claims/${c.id}/review`, { action: "approve" });
+    } catch (e) {
+      setBulkErr((e as Error).message);
+    } finally {
+      setBulk("idle");
+      await list.reload(true);
+      reloadOverview();
+    }
+  }
+
+  // j / k move through the list (ignored while typing).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const t = e.target as HTMLElement;
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key !== "j" && e.key !== "k") return;
+      const i = claims.findIndex((c) => c.id === selected);
+      const next = claims[e.key === "j" ? i + 1 : i - 1];
+      if (next) setSelected(next.id);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [claims, selected]);
+
   async function afterAction(id: string) {
     const idx = claims.findIndex((c) => c.id === id);
     await list.reload(true);
@@ -61,7 +98,53 @@ export default function ReviewPage() {
           </Notice>
         </div>
       )}
-      <div className="mb-4 flex gap-1 rounded-lg bg-slate-100 p-1 text-sm w-fit">
+      {all.length > 0 && (
+        <Card className="mb-4 p-4" data-testid="review-progress">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium text-slate-800">
+                {decided} of {all.length} findings decided
+              </div>
+              <div className="mt-2 h-2 w-full max-w-md overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-all"
+                  style={{ width: `${Math.round((100 * decided) / all.length)}%` }}
+                />
+              </div>
+            </div>
+            {easy.length > 1 &&
+              (bulk === "confirm" ? (
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-slate-600">Approve all {easy.length} findings backed by their source?</span>
+                  <Button size="sm" variant="success" onClick={approveEasy}>
+                    Yes, approve {easy.length}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setBulk("idle")}>
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setBulk("confirm")}
+                  loading={bulk === "working"}
+                  data-guide="approve-backed"
+                >
+                  <CheckCheck className="h-4 w-4" /> Approve all {easy.length} backed by their source
+                </Button>
+              ))}
+          </div>
+          {bulkErr && <div className="mt-2 text-sm text-rose-700">{bulkErr}</div>}
+          <p className="mt-2 hidden text-xs text-slate-500 sm:block">
+            Shortcuts: <kbd className="rounded border px-1">a</kbd> approve · <kbd className="rounded border px-1">r</kbd> reject
+            · <kbd className="rounded border px-1">e</kbd> edit · <kbd className="rounded border px-1">j</kbd>/
+            <kbd className="rounded border px-1">k</kbd> next / previous. Findings that sources disagree about or that aren't
+            backed are never included in “approve all”.
+          </p>
+        </Card>
+      )}
+      <div className="mb-4 flex w-fit gap-1 rounded-lg bg-slate-100 p-1 text-sm">
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -93,7 +176,7 @@ export default function ReviewPage() {
       )}
       {claims.length > 0 && (
         <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
-          <Card className="max-h-[70vh] overflow-y-auto">
+          <Card className="order-2 max-h-[40vh] overflow-y-auto lg:order-1 lg:max-h-[70vh]">
             {claims.map((c) => (
               <button
                 key={c.id}
@@ -111,7 +194,11 @@ export default function ReviewPage() {
               </button>
             ))}
           </Card>
-          {selected && <ReviewPanel key={selected} id={selected} onDone={() => afterAction(selected)} />}
+          {selected && (
+            <div className="order-1 lg:order-2">
+              <ReviewPanel key={selected} id={selected} onDone={() => afterAction(selected)} />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -124,6 +211,27 @@ function ReviewPanel({ id, onDone }: { id: string; onDone: () => void }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  const unverifiedNow = c?.confidence === "unverified";
+  const blockedNow = c?.confidence === "conflicting" && c?.conflicts?.some((k) => k.status === "open");
+  // a / r / e on the open finding (ignored while typing or while a form is open).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const t = e.target as HTMLElement;
+      if (!c || mode || busy || c.review_state !== "pending") return;
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "a") {
+        if (unverifiedNow) setMode("assert");
+        else if (!blockedNow) void act("approve");
+      } else if (e.key === "r") setMode("reject");
+      else if (e.key === "e") {
+        setMode("edit");
+        setText(c.statement);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   if (loading) return <Spinner />;
   if (error) return <ErrorBox message={error.message} />;

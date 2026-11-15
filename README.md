@@ -162,7 +162,7 @@ More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Auth | PyJWT sessions, scrypt password hashes (Python standard library), hashed one-time invite tokens |
 | Integrations | GitHub REST API (read-only) |
 | Email | Resend HTTP API (optional) |
-| Quality | pytest (51 API tests, SQLite + PostgreSQL), Vitest + Testing Library (17), Playwright (5 journeys), ruff, ESLint, Prettier, GitHub Actions |
+| Quality | pytest (54 API tests, SQLite + PostgreSQL), Vitest + Testing Library (17), Playwright (5 journeys), ruff, ESLint, Prettier, GitHub Actions |
 
 Full endpoint list: [API.md](API.md). Database script: [`backend/sql/schema.sql`](backend/sql/schema.sql)
 (regenerate with `python scripts/make_schema_sql.py`).
@@ -218,7 +218,7 @@ npm test                             # component tests
 npx playwright test                  # browser journeys (starts both servers with the scripted AI; set PYTHON to the venv's python)
 ```
 
-**5. Measure the AI** (needs the Gemini key): `python -m eval.run_eval` from `backend/`. See [backend/eval/README.md](backend/eval/README.md).
+**5. Measure the AI**: `python -m eval.run_eval --api https://baton-api-haqs.onrender.com` from `backend/` tests the deployed app with its own Gemini (or `python -m eval.run_eval` locally with your key). See [backend/eval/README.md](backend/eval/README.md).
 
 More detail: [SETUP.md](SETUP.md). Deploying: [DEPLOY.md](DEPLOY.md). Testing record: [TESTING.md](TESTING.md).
 Roadmap: [ROADMAP.md](ROADMAP.md).

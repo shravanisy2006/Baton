@@ -95,10 +95,20 @@ class SignInIn(BaseModel):
     password: str = Field(min_length=1, max_length=200)
 
 
+# Per-network limits. They are generous because a judging room or a college shares one public address (NAT):
+# many honest people can arrive from the same network within the hour.
+SIGNUPS_PER_NETWORK_HOUR = 30
+DEMO_COPIES_PER_NETWORK_HOUR = 40
+SIGNINS_PER_NETWORK_15MIN = 120
+
+
 @router.post("/signup")
 def sign_up(body: SignUpIn, request: Request, db: Session = Depends(get_db)):
     ratelimit.hit(
-        f"signup:{ratelimit.client_ip(request)}", 10, 3600, "Too many new accounts from this network. Try again in an hour."
+        f"signup:{ratelimit.client_ip(request)}",
+        SIGNUPS_PER_NETWORK_HOUR,
+        3600,
+        "Too many new accounts from this network. Try again in an hour.",
     )
     email = _clean_email(body.email)
     name = body.name.strip()
@@ -132,16 +142,19 @@ def sign_in(body: SignInIn, request: Request, s: Session_ | None = Depends(_opti
     ip = ratelimit.client_ip(request)
     email = (body.email or "").strip().lower()
     # Limits are per network address: failing on purpose can't lock anyone else out of their account.
-    ratelimit.hit(f"signin-ip:{ip}", 40, 900, "Too many sign-in attempts from this network. Wait 15 minutes.")
+    ratelimit.hit(
+        f"signin-ip:{ip}", SIGNINS_PER_NETWORK_15MIN, 900, "Too many sign-in attempts from this network. Wait 15 minutes."
+    )
+    if email in DEMO_LOGINS:
+        # The demo password is published on the home page, so there is nothing to guess: a typo is never counted,
+        # and one judge's mistakes can't block other judges on the same network.
+        if not password_ok(body.password):
+            raise HTTPException(401, "That's not the demo password. It is shown on the home page: Baton-Judge-2026.")
+        return _demo_sign_in(DEMO_LOGINS[email], request, s, db)
+
     fail_key = f"signin-fail:{ip}:{email}"
     if ratelimit.count(fail_key, 900) >= 8:
         raise HTTPException(429, "Too many wrong passwords for this email from this network. Wait 15 minutes.")
-
-    if email in DEMO_LOGINS:
-        if not password_ok(body.password):
-            ratelimit.record(fail_key)
-            raise HTTPException(401, "Email or password is incorrect.")
-        return _demo_sign_in(DEMO_LOGINS[email], request, s, db)
 
     user = (
         db.query(User).filter(User.email == email, User.merged_into.is_(None), User.deleted_at.is_(None)).first()
@@ -164,7 +177,7 @@ class DemoIn(BaseModel):
 def _demo_rate(request: Request) -> None:
     ratelimit.hit(
         f"demo:{ratelimit.client_ip(request)}",
-        12,
+        DEMO_COPIES_PER_NETWORK_HOUR,
         3600,
         "You've opened many demo copies from this network. Try again in an hour.",
     )

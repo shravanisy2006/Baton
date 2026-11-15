@@ -31,23 +31,32 @@ def test_failed_signins_cannot_lock_out_someone_else(client):
 
 
 def test_demo_signins_cannot_be_locked_by_others(client):
-    for _ in range(9):
-        client.post("/auth/signin", json={"email": "karan@baton.demo", "password": "wrong"}, headers=ip("6.6.6.6"))
-    r = client.post("/auth/signin", json={"email": "karan@baton.demo", "password": DEMO_PW}, headers=ip("9.9.9.9"))
-    assert r.status_code == 200
+    # Judges in one room share a network address: wrong demo passwords from that network never block it.
+    for _ in range(12):
+        r = client.post("/auth/signin", json={"email": "karan@baton.demo", "password": "wrong"}, headers=ip("6.6.6.6"))
+        assert r.status_code == 401 and "Baton-Judge-2026" in r.json()["detail"]
+    for addr in ("6.6.6.6", "9.9.9.9"):
+        r = client.post("/auth/signin", json={"email": "karan@baton.demo", "password": DEMO_PW}, headers=ip(addr))
+        assert r.status_code == 200
 
 
-def test_anonymous_creation_is_rate_limited(client):
-    codes = [client.post("/auth/demo", json={"stage": "fresh"}, headers=ip("7.7.7.7")).status_code for _ in range(13)]
-    assert codes[:12] == [200] * 12 and codes[12] == 429
+def test_anonymous_creation_is_rate_limited(client, monkeypatch):
+    import app.auth.router as auth_router
+
+    # Defaults leave room for a judging room behind one shared address.
+    assert auth_router.DEMO_COPIES_PER_NETWORK_HOUR >= 30 and auth_router.SIGNUPS_PER_NETWORK_HOUR >= 20
+    monkeypatch.setattr(auth_router, "DEMO_COPIES_PER_NETWORK_HOUR", 5)
+    monkeypatch.setattr(auth_router, "SIGNUPS_PER_NETWORK_HOUR", 4)
+    codes = [client.post("/auth/demo", json={"stage": "fresh"}, headers=ip("7.7.7.7")).status_code for _ in range(6)]
+    assert codes[:5] == [200] * 5 and codes[5] == 429
     assert client.post("/auth/demo", json={"stage": "fresh"}, headers=ip("8.8.8.8")).status_code == 200
     codes = [
         client.post(
             "/auth/signup", headers=ip("5.5.5.5"), json={"name": "N", "email": f"n{i}@example.com", "password": "long-enough-1"}
         ).status_code
-        for i in range(11)
+        for i in range(5)
     ]
-    assert codes[:10] == [200] * 10 and codes[10] == 429
+    assert codes[:4] == [200] * 4 and codes[4] == 429
 
 
 # ---------- sessions ----------
@@ -466,3 +475,35 @@ def test_old_shared_demo_is_removed_but_real_work_is_kept(client):
         assert db.get(Account, old_acc) is None
         assert db.query(User).filter_by(email="reviewer@baton.demo").count() == 0
         assert db.get(Account, guest_id) is not None and db.get(Project, real_id) is not None
+
+
+# ---------- operations: request references, headers, version ----------
+
+
+def test_responses_carry_reference_security_headers_and_version(client):
+    r = client.get("/health")
+    assert r.json()["version"] and len(r.headers["X-Request-ID"]) == 8
+    for h, v in {"X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY", "Cache-Control": "no-store"}.items():
+        assert r.headers[h] == v
+
+
+def test_server_errors_give_a_reference_and_logs_mask_tokens(caplog):
+    from fastapi.testclient import TestClient
+
+    from app.main import app, safe_path
+
+    def boom():
+        raise RuntimeError("kaput")
+
+    app.add_api_route("/__boom/{token}", boom)
+    try:
+        with caplog.at_level("ERROR"):
+            r = TestClient(app, raise_server_exceptions=False).get("/__boom/" + "A" * 32)
+    finally:
+        app.router.routes = [x for x in app.router.routes if getattr(x, "path", "") != "/__boom/{token}"]
+    assert r.status_code == 500
+    ref = r.json()["reference"]
+    assert ref in r.json()["detail"] and r.headers["X-Request-ID"] == ref
+    assert ref in caplog.text and "A" * 32 not in caplog.text and "[token]" in caplog.text
+    assert safe_path("/invites/abcdefghijklmnopqrstuvwx/accept") == "/invites/[token]/accept"
+    assert safe_path("/projects/0a1b2c3d4e5f/claims") == "/projects/0a1b2c3d4e5f/claims"  # ids stay readable

@@ -56,6 +56,7 @@ export default function Landing() {
   const [server, setServer] = useState<"checking" | "up" | "slow" | "down">("checking");
   const [waited, setWaited] = useState(0);
   const [attempt, setAttempt] = useState(0);
+  const [serverVersion, setServerVersion] = useState<string | null>(null);
 
   // The free server sleeps when idle and needs up to a minute to wake. Keep knocking quietly for
   // up to 3 minutes, showing a friendly "waking up" note, before saying it's unreachable.
@@ -72,7 +73,11 @@ export default function Landing() {
           const r = await fetch(`${API_URL}/health`, { signal: ctrl.signal });
           clearTimeout(t);
           if (r.ok) {
-            if (!stopped) setServer("up");
+            const body = await r.json().catch(() => ({}));
+            if (!stopped) {
+              setServer("up");
+              setServerVersion(body.version ?? null);
+            }
             return;
           }
         } catch {
@@ -320,6 +325,9 @@ export default function Landing() {
 
       <footer className="border-t border-slate-100 py-8 text-center text-xs text-slate-400">
         Baton · built by Team Pixels for the We Code Coders hackathon · demo data is synthetic
+        <div className="mt-1 font-mono" data-testid="versions">
+          website {__WEB_VERSION__} · server {serverVersion ?? "…"}
+        </div>
       </footer>
     </div>
   );

@@ -91,7 +91,7 @@ Gate 1 (code) → merge duplicates → Gate 2 (AI) → conflicts → timeline ch
 *update* run reads only evidence that isn't analysed yet, merges restatements into existing claims as extra support,
 reports only conflicts involving new claims, and flags approved claims those conflicts touch. Reviewers act on the results;
 handover versions are snapshots of approved claims with a fingerprint of each, so Baton knows when a handover is out of
-date and can diff version N+1 against version N. Ask Baton retrieves evidence in code (filtered by the asker's level),
+date and can diff version N+1 against version N. Ask Baton selects evidence in code (filtered by the asker's level: all of it when it fits, otherwise ranked search with AI keywords),
 lets Gemini draft a cited answer, and keeps only quotes that pass the same word-for-word check.
 
 **Technically hard parts.**
@@ -162,7 +162,7 @@ Every "known issue" we listed in Round 2 was worked on:
 
 ## 4. Testing details
 
-- **51 API tests** (`backend/tests`), passing on SQLite (Python 3.12 and 3.15) and on PostgreSQL 16; backend coverage
+- **54 API tests** (`backend/tests`), passing on SQLite and on PostgreSQL 16; backend coverage
   88%. A scripted AI makes deliberate mistakes (invented quote, one changed word, missing evidence, unsupported claim,
   injected instructions) and the tests check Baton catches each one. They cover accounts, invites, the living handover,
   Ask Baton, deletion everywhere, rate limits and lockout, session revocation, email delivery (mocked provider),
@@ -172,7 +172,8 @@ Every "known issue" we listed in Round 2 was worked on:
   and an account.
 - **CI** (GitHub Actions) runs lint, all of the above, and the evaluation set's offline retrieval check on every push.
 - **AI evaluation:** a separate labelled project (`backend/eval`). Offline retrieval measured; the live run with Gemini is
-  scored by `python -m eval.run_eval` and committed to `backend/eval/results/` (no numbers are claimed before it runs).
+  scored by `python -m eval.run_eval --api <deployed API>` (the deployed app, its own Gemini, through the public API)
+  and committed to `backend/eval/results/` (no numbers are claimed before it runs).
 - **In-place upgrade** of a Round 3 Postgres database to the final schema, with no data loss.
 - Full record: [TESTING.md](TESTING.md).
 

@@ -20,6 +20,9 @@ cd backend
 .venv\Scripts\activate
 python -m eval.run_eval            # live AI from backend/.env, no cached answers, ~30 calls, 3-6 minutes
 python -m eval.run_eval --offline  # no AI: keyword retrieval only
+python -m eval.run_eval --api https://baton-api-haqs.onrender.com
+                                   # the DEPLOYED app through its public API, using the server's own Gemini
+                                   # (no key needed here); its throw-away account and project are deleted after
 ```
 
 Results are written to `eval/results/` (Markdown + JSON with every claim, conflict and answer, so each number can
@@ -43,5 +46,7 @@ be checked by hand).
 | | Correct evidence in top 12, rephrased questions | 4/5 |
 
 The previous (Round 3) retrieval scored the same on this data (4/4, 3/5, 4/5): the stemming added in the final
-pass doesn't change these questions. Rephrased questions rely on the AI keyword step, which is only measured in a
-live run. **Live results: not yet run** — they need the Gemini key, which is only on the team's machine.
+pass doesn't change these questions. Since then, Ask Baton shows the AI all permitted evidence when it fits (this
+project does), so the evidence the AI sees contains the answer for every answerable question: literal 4/4,
+rephrased 5/5 (offline, 15 Nov 2026). Whether the AI then answers correctly is only measured in a live run.
+**Live results: not yet run** — run `--api` against the deployed app, or the local run with the team's key.

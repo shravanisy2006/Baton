@@ -9,6 +9,7 @@
    labelled evidence, so the next person who asks gets it with a citation.
 """
 
+import os
 import re
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -26,6 +27,10 @@ from ..verify.service import find_quote
 
 router = APIRouter(tags=["ask"])
 TOP_K = 12
+# When everything the asker may see fits in this many characters, the AI gets all of it (ranked best first)
+# instead of a keyword shortlist, so rephrased questions can't miss the answer. Quotes are still checked word
+# for word. Larger projects fall back to ranked retrieval with AI search keywords.
+FULL_CONTEXT_CHARS = int(os.environ.get("ASK_FULL_CONTEXT_CHARS", "60000"))
 STOP = set(
     """a an the is are was were be been to of in on for and or but with at by from it this that these those
 what which who whom whose why how when where do does did can could should would will shall may might must i we you
@@ -126,6 +131,24 @@ def expand_question(db: Session, question: str) -> list[str]:
     return [k.strip()[:60] for k in plan.keywords if k.strip()][:15]
 
 
+def select_evidence(
+    db: Session | None, units: list[EvidenceUnit], question: str, filenames: dict[str, str]
+) -> tuple[list[EvidenceUnit], str]:
+    """What the AI is shown for a question, and how it was chosen.
+
+    - "all": the asker's whole permitted evidence fits the budget, so nothing can be missed by retrieval; units are
+      ordered best match first.
+    - "search": ranked retrieval over the permitted evidence, with AI-suggested keywords for rephrased questions.
+    Either way `units` is already filtered by the asker's access level."""
+    total = sum(len(u.text) + 80 for u in units)
+    if total <= FULL_CONTEXT_CHARS:
+        ranked = retrieve(units, question, k=len(units), filenames=filenames)
+        seen = {u.id for u in ranked}
+        return ranked + sorted((u for u in units if u.id not in seen), key=lambda u: u.seq), "all"
+    expansions = expand_question(db, question) if db is not None else []
+    return retrieve(units, question, extra_terms=expansions, filenames=filenames), "search"
+
+
 def _format(u: EvidenceUnit, filename: str) -> str:
     meta = [filename]
     if u.author:
@@ -168,8 +191,7 @@ def ask(project_id: str, body: AskIn, s=Depends(current_session), db: Session = 
     if not units:
         raise HTTPException(409, "There is no evidence in this project yet.")
     filenames = {x.id: x.filename for x in db.query(Source).filter_by(project_id=project_id)}
-    expansions = expand_question(db, question)
-    top = retrieve(units, question, extra_terms=expansions, filenames=filenames)
+    top, how = select_evidence(db, units, question, filenames)
     q = Question(
         project_id=project_id,
         asked_by=m.user.id,
@@ -233,6 +255,8 @@ def ask(project_id: str, body: AskIn, s=Depends(current_session), db: Session = 
         status=q.status,
         citations=len(q.citations or []),
         rejected_quotes=q.rejected_quotes,
+        evidence_shown=len(top),
+        selection=how,
     )
     db.commit()
     return question_out(q)
