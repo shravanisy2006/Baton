@@ -1,8 +1,10 @@
 """Database tables. Mirrors backend/sql/schema.sql (which adds Supabase Row-Level Security policies)."""
+
 import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -24,22 +26,35 @@ LABEL_BY_NAME = {v.lower(): k for k, v in LABELS.items()}
 ROLES = ("admin", "reviewer", "departing", "incoming", "viewer")
 
 CLAIM_TYPES = (
-    "decision", "task", "owner", "blocker", "dependency",
-    "risk", "open_question", "recurring_problem", "contact",
+    "decision",
+    "task",
+    "owner",
+    "blocker",
+    "dependency",
+    "risk",
+    "open_question",
+    "recurring_problem",
+    "contact",
 )
 APPROVED_STATES = ("approved", "corrected")  # what may enter the handover
 
 CONFIDENCE = (
-    "verified", "corroborated", "weak", "conflicting",
-    "unverified", "leaver_attested", "reviewer_asserted",
+    "verified",
+    "corroborated",
+    "weak",
+    "conflicting",
+    "unverified",
+    "leaver_attested",
+    "reviewer_asserted",
 )
 
 
 class Account(Base):
     """A browser session's owner (guest or signed-in). Personas it creates belong to it."""
+
     __tablename__ = "accounts"
     id: Mapped[str] = mapped_column(String(24), primary_key=True, default=new_id)
-    kind: Mapped[str] = mapped_column(String(16), default="guest")  # guest | supabase
+    kind: Mapped[str] = mapped_column(String(16), default="user")  # user | demo (private demo sandbox) | guest (legacy)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
@@ -48,19 +63,25 @@ class User(Base):
     """A person. Either a signed-up account holder (has email + password) or a person a reviewer has named
     but who hasn't joined yet (no email). When that person accepts an invite, their memberships move to their
     own account and this record is marked merged_into."""
+
     __tablename__ = "users"
     id: Mapped[str] = mapped_column(String(24), primary_key=True, default=new_id)
     account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), index=True)
     name: Mapped[str] = mapped_column(String(120))
     handle: Mapped[str | None] = mapped_column(String(120), nullable=True)  # e.g. GitHub username
-    email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True, index=True)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     merged_into: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    # Bumped by "sign out everywhere", password change and account deletion: older session tokens stop working.
+    session_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
 class Invite(Base):
     """A one-time link that lets a named person join a project with their own account."""
+
     __tablename__ = "invites"
     id: Mapped[str] = mapped_column(String(24), primary_key=True, default=new_id)
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
@@ -135,6 +156,8 @@ class EvidenceUnit(Base):
     location: Mapped[dict] = mapped_column(JSON, default=dict)
     access_label: Mapped[int] = mapped_column(Integer, default=TEAM)
     analysed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # e.g. ["instructions"]: the text looks like instructions aimed at an AI (possible prompt injection).
+    flags: Mapped[list] = mapped_column(JSON, default=list, server_default=sql_text("'[]'"))
     source: Mapped[Source] = relationship()
 
 
@@ -145,6 +168,7 @@ class Claim(Base):
     code: Mapped[str] = mapped_column(String(16))  # C-1, C-2 ...
     type: Mapped[str] = mapped_column(String(24))
     subject: Mapped[str] = mapped_column(String(200), default="")
+    topic: Mapped[str | None] = mapped_column(String(200), nullable=True)  # shared name for subjects worded differently
     statement: Mapped[str] = mapped_column(Text)
     original_statement: Mapped[str] = mapped_column(Text)
     status: Mapped[str | None] = mapped_column(String(24), nullable=True)  # task status
@@ -257,6 +281,7 @@ class Review(Base):
 
 class AuditEvent(Base):
     """Append-only. The API never updates or deletes rows here."""
+
     __tablename__ = "audit_events"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
@@ -271,6 +296,7 @@ class AuditEvent(Base):
 
 class Question(Base):
     """Ask Baton: a member's question, answered only from evidence they may see, with checked quotes."""
+
     __tablename__ = "questions"
     id: Mapped[str] = mapped_column(String(24), primary_key=True, default=new_id)
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
@@ -294,8 +320,11 @@ class Job(Base):
     id: Mapped[str] = mapped_column(String(24), primary_key=True, default=new_id)
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
     kind: Mapped[str] = mapped_column(String(24), default="analyse")
-    status: Mapped[str] = mapped_column(String(16), default="queued")  # queued running done failed
+    status: Mapped[str] = mapped_column(String(16), default="queued", index=True)  # queued running done failed
     stage: Mapped[str] = mapped_column(String(40), default="")
+    actor_id: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     warnings: Mapped[list] = mapped_column(JSON, default=list)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     stats: Mapped[dict] = mapped_column(JSON, default=dict)
@@ -309,4 +338,31 @@ class LLMCache(Base):
     task: Mapped[str] = mapped_column(String(32))
     model: Mapped[str] = mapped_column(String(80))
     response: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class Token(Base):
+    """One-time tokens sent by email (verify an address, reset a password). Only the SHA-256 hash is stored."""
+
+    __tablename__ = "tokens"
+    id: Mapped[str] = mapped_column(String(24), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(16))  # verify | reset
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class EmailLog(Base):
+    """Every email Baton tried to send, with the real outcome (sent / failed / not_configured)."""
+
+    __tablename__ = "email_log"
+    id: Mapped[str] = mapped_column(String(24), primary_key=True, default=new_id)
+    project_id: Mapped[str | None] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=True, index=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    to_hint: Mapped[str] = mapped_column(String(80))  # masked address, e.g. k***@example.com
+    subject: Mapped[str] = mapped_column(String(200))
+    status: Mapped[str] = mapped_column(String(16))
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

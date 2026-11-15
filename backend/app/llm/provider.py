@@ -4,10 +4,12 @@ Every call asks for JSON that must validate against a Pydantic model. Invalid ou
 and then rejected loudly; it is never accepted silently. Responses are cached by a hash of the
 prompt, so re-running the same evidence costs no quota and gives the same result.
 """
+
 import hashlib
 import json
 import logging
 import time
+from functools import lru_cache
 from typing import Callable, TypeVar
 
 from pydantic import BaseModel, ValidationError
@@ -69,6 +71,7 @@ class GeminiProvider(Provider):
 
 class FakeProvider(Provider):
     """Used only by automated tests: returns scripted JSON from a function."""
+
     name = "fake"
     model = "fake-model"
 
@@ -89,15 +92,22 @@ def set_providers_for_tests(providers: list[Provider] | None) -> None:
     _override = providers
 
 
+@lru_cache(maxsize=8)
+def _gemini(api_key: str, model: str) -> "GeminiProvider":
+    """One client per model for the life of the process (clients hold connection pools; making one per call is
+    slow and wasteful). The google-genai client is safe to share between threads."""
+    return GeminiProvider(api_key, model)
+
+
 def providers() -> list[Provider]:
     if _override is not None:
         return _override
     s = get_settings()
     chain: list[Provider] = []
     if s.ai_configured:
-        chain.append(GeminiProvider(s.gemini_api_key, s.gemini_model))
+        chain.append(_gemini(s.gemini_api_key, s.gemini_model))
         if s.backup_provider.startswith("gemini:"):
-            chain.append(GeminiProvider(s.gemini_api_key, s.backup_provider.split(":", 1)[1]))
+            chain.append(_gemini(s.gemini_api_key, s.backup_provider.split(":", 1)[1]))
     return chain
 
 
@@ -113,8 +123,9 @@ def _cache_key(task: str, system: str, prompt: str) -> str:
     return hashlib.sha256(f"{PROMPT_VERSION}|{task}|{system}|{prompt}".encode()).hexdigest()
 
 
-def call_json(db: Session, task: str, system: str, prompt: str, schema: type[T], images=None,
-              reverse: bool = False) -> tuple[T, str]:
+def call_json(
+    db: Session, task: str, system: str, prompt: str, schema: type[T], images=None, reverse: bool = False
+) -> tuple[T, str]:
     """Return (validated result, provider label). Raises AIUnavailable or InvalidAIOutput.
     `images` is a list of (bytes, mime type) sent with the prompt; `reverse` asks the backup model first
     (used for a second opinion)."""
@@ -153,8 +164,7 @@ def call_json(db: Session, task: str, system: str, prompt: str, schema: type[T],
                     time.sleep(3)
                     continue  # one short retry on the same model, then the backup
                 break  # try next provider
-            db.merge(LLMCache(key=key, task=task, model=f"{provider.name}:{provider.model}",
-                              response=result.model_dump()))
+            db.merge(LLMCache(key=key, task=task, model=f"{provider.name}:{provider.model}", response=result.model_dump()))
             db.commit()
             return result, f"{provider.name}:{provider.model}"
     if all("invalid output" in e for e in errors):

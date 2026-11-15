@@ -1,4 +1,4 @@
-import { Copy, Download, KeyRound, LogIn } from "lucide-react";
+import { Copy, Download, KeyRound, LogIn, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, API_URL } from "../lib/api";
@@ -9,24 +9,28 @@ import { Button, ErrorBox } from "./ui";
 interface Info {
   accounts: { role: string; name: string; email: string }[];
   password: string;
-  status: "idle" | "building" | "ready" | "failed";
-  error: string | null;
+  private: boolean;
+  kept_hours: number;
 }
 
 const WHAT: Record<string, { label: string; tryIt: string; page: string }> = {
   reviewer: {
     label: "Reviewer",
-    tryIt: "Upload the newer note below and press Analyse: see “Changed since approval” and make version 2. Or invite yourself.",
+    tryIt: "Upload the newer note (below), press Analyse, see what changed and approve version 2.",
     page: "",
   },
   departing: { label: "Person leaving", tryIt: "Answer the questions only you can answer.", page: "/gaps" },
-  incoming: { label: "New member", tryIt: "Read the approved handover, open the evidence, and Ask Baton a question.", page: "/handover" },
+  incoming: {
+    label: "New member",
+    tryIt: "Read the handover, open the evidence behind any line, ask Baton a question.",
+    page: "/handover",
+  },
 };
 
-/** Ready-made accounts for judges, with one-click sign-in. */
+/** Demo sign-ins. Each opens the visitor's own private copy of the EventApp demo. */
 export default function JudgeAccounts({ compact }: { compact?: boolean }) {
-  const info = useApi(() => api.get<Info>("/judge-demo"), []);
-  const { signIn } = useSession();
+  const info = useApi(() => api.get<Info>("/auth/demo/info"), []);
+  const { demoSignIn } = useSession();
   const nav = useNavigate();
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -37,9 +41,8 @@ export default function JudgeAccounts({ compact }: { compact?: boolean }) {
     setBusy(email);
     setErr(null);
     try {
-      await signIn(email, info.data.password);
-      const projects = await api.get<{ id: string }[]>("/projects");
-      nav(projects.length ? `/p/${projects[0].id}${page}` : "/projects");
+      const pid = await demoSignIn(email, info.data.password);
+      nav(pid ? `/p/${pid}${page}` : "/projects");
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -50,16 +53,19 @@ export default function JudgeAccounts({ compact }: { compact?: boolean }) {
   if (info.error) return null;
   const d = info.data;
   return (
-    <div className="rounded-xl border border-brand-100 bg-white p-5 text-left shadow-sm">
+    <div className="rounded-xl border border-brand-100 bg-white p-5 text-left shadow-sm" data-testid="demo-accounts">
       <div className="flex flex-wrap items-center gap-2">
         <KeyRound className="h-4 w-4 text-brand-600" />
-        <h2 className="font-semibold text-slate-900">Demo accounts for judges</h2>
-        {d?.status === "building" && <span className="text-xs text-amber-700">Preparing the demo project… (about a minute)</span>}
+        <h2 className="font-semibold text-slate-900">Demo sign-ins for judges</h2>
       </div>
       {!compact && (
-        <p className="mt-1 text-sm text-slate-600">
-          A shared project that is already analysed, reviewed and handed over (version 1), with three real accounts. Sign in
-          with one click, or type the details. Use a private window for a second person. Anyone can reset it from its Overview.
+        <p className="mt-1 flex items-start gap-1.5 text-sm text-slate-600">
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+          <span>
+            Each sign-in opens <b>your own private copy</b> of a project that is already analysed, reviewed and handed over.
+            Nobody else sees your changes. Signing in as another person in the same browser keeps you in the same copy. Copies are
+            deleted after {d?.kept_hours ?? 24} hours.
+          </span>
         </p>
       )}
       <div className="mt-3 divide-y divide-slate-100">
@@ -77,8 +83,9 @@ export default function JudgeAccounts({ compact }: { compact?: boolean }) {
               variant="secondary"
               className={compact ? "ml-auto" : ""}
               loading={busy === a.email}
-              disabled={!!busy || d?.status === "building"}
+              disabled={!!busy || !d}
               onClick={() => go(a.email, WHAT[a.role]?.page ?? "")}
+              aria-label={`Sign in as ${a.name}`}
             >
               <LogIn className="h-3.5 w-3.5" /> Sign in
             </Button>
@@ -92,18 +99,24 @@ export default function JudgeAccounts({ compact }: { compact?: boolean }) {
             <button
               className="ml-1.5 inline-flex items-center gap-1 text-brand-700 hover:underline"
               onClick={() => {
-                navigator.clipboard?.writeText(d.password).then(() => setCopied(true), () => undefined);
+                navigator.clipboard?.writeText(d.password).then(
+                  () => setCopied(true),
+                  () => undefined,
+                );
               }}
             >
               <Copy className="h-3 w-3" /> {copied ? "copied" : "copy"}
             </button>
           </span>
-          <a className="inline-flex items-center gap-1 text-brand-700 hover:underline" href={`${API_URL}/samples/standup-2026-11-12.md`}>
+          <a
+            className="inline-flex items-center gap-1 text-brand-700 hover:underline"
+            href={`${API_URL}/samples/standup-2026-11-12.md`}
+          >
             <Download className="h-3 w-3" /> Newer file to test the living handover
           </a>
         </div>
       )}
-      {d?.status === "failed" && <p className="mt-2 text-xs text-rose-700">The demo project couldn't be prepared: {d.error}</p>}
+      {busy && <p className="mt-2 text-xs text-slate-500">Preparing your private copy… (a few seconds)</p>}
       {err && (
         <div className="mt-3">
           <ErrorBox message={err} />

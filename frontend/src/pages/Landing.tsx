@@ -1,4 +1,16 @@
-import { ArrowRight, CheckCircle2, ClipboardCheck, FileSearch, Lock, MessageCircleQuestion, Plug, RefreshCw, Send, ShieldCheck, Users } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  ClipboardCheck,
+  FileSearch,
+  Lock,
+  MessageCircleQuestion,
+  Plug,
+  RefreshCw,
+  Send,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_URL } from "../lib/api";
@@ -9,17 +21,37 @@ import { Button, ErrorBox } from "../components/ui";
 import Logo from "../components/Logo";
 
 const STEPS = [
-  { icon: Plug, title: "Connect", text: "Upload notes, PDFs, Word files and task lists, or import a GitHub repo. Label each source Team, Leads or Restricted." },
-  { icon: FileSearch, title: "Reconstruct", text: "Sources are cut into numbered evidence pieces. AI proposes typed claims that must quote that evidence." },
-  { icon: ShieldCheck, title: "Verify", text: "Code checks every quote really exists. A second check confirms it supports the claim. Gaps and conflicts are flagged." },
-  { icon: ClipboardCheck, title: "Review", text: "A reviewer approves, edits or rejects each claim next to its highlighted source, and resolves conflicts." },
-  { icon: Send, title: "Handover", text: "The new member sees an approved, role-filtered handover where every line links back to its evidence." },
+  {
+    icon: Plug,
+    title: "Add the files",
+    text: "Upload notes, PDFs, Word files, task lists, chats or photos of whiteboards, or import a GitHub repo. Mark each one Team, Leads or Restricted.",
+  },
+  {
+    icon: FileSearch,
+    title: "Baton reads them",
+    text: "The AI lists the decisions, owners, tasks and risks it finds, and must quote the exact words it relied on.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Every quote is checked",
+    text: "Code confirms each quote really is in the file, a second check confirms it backs the statement, and disagreements and gaps are flagged.",
+  },
+  {
+    icon: ClipboardCheck,
+    title: "A person approves",
+    text: "A reviewer approves, fixes or rejects each finding next to its highlighted source, and decides between sources that disagree.",
+  },
+  {
+    icon: Send,
+    title: "The handover",
+    text: "The new person gets an approved handover where every line opens its evidence, showing only what they're allowed to see.",
+  },
 ];
 
 export default function Landing() {
   const { me, startDemo } = useSession();
   const nav = useNavigate();
-  const [busy, setBusy] = useState<"demo" | "guest" | null>(null);
+  const [busy, setBusy] = useState<"demo" | "demo-new" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [server, setServer] = useState<"checking" | "up" | "slow" | "down">("checking");
   const [waited, setWaited] = useState(0);
@@ -59,12 +91,12 @@ export default function Landing() {
     };
   }, [attempt]);
 
-  async function demo() {
-    setBusy("demo");
+  async function demo(role: "reviewer" | "incoming" = "reviewer") {
+    setBusy(role === "reviewer" ? "demo" : "demo-new");
     setError(null);
     try {
-      const pid = await startDemo();
-      nav(`/p/${pid}`);
+      const pid = await startDemo(role);
+      nav(role === "incoming" ? `/p/${pid}/handover` : `/p/${pid}`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -72,7 +104,7 @@ export default function Landing() {
     }
   }
 
-  function guest() {
+  function ownProject() {
     nav(me?.registered ? "/projects" : "/signin?next=/projects");
   }
 
@@ -98,24 +130,20 @@ export default function Landing() {
           When someone leaves, don't let the project's knowledge leave with them.
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-lg text-slate-600">
-          Baton turns scattered project activity into a handover where every line is checked against a real quote, every gap
-          is shown honestly, and the new member only sees what they're allowed to see.
+          Baton turns scattered project activity into a handover where every line is checked against a real quote, every gap is
+          shown honestly, and the new member only sees what they're allowed to see.
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Button onClick={guest} disabled={!!busy} className="px-5 py-2.5 text-base">
-            Try it with your project <ArrowRight className="h-4 w-4" />
+          <Button onClick={() => demo("reviewer")} loading={busy === "demo"} disabled={!!busy} className="px-5 py-2.5 text-base">
+            Try the demo, no sign-up <ArrowRight className="h-4 w-4" />
           </Button>
-          <Button
-            variant="secondary"
-            onClick={() => document.getElementById("how")?.scrollIntoView({ behavior: "smooth" })}
-            className="px-5 py-2.5 text-base"
-          >
-            See how it works
+          <Button variant="secondary" onClick={ownProject} disabled={!!busy} className="px-5 py-2.5 text-base">
+            Start with your own project
           </Button>
         </div>
         <p className="mt-3 text-xs text-slate-500">
-          Free account. Name who is leaving and who is taking over, invite them, upload the project's files, and Baton guides
-          you step by step. Just looking? The worked example needs no account.
+          The demo opens your own private copy of a finished handover (deleted after 24 hours). Your own project needs a free
+          account; Baton guides you step by step.
         </p>
         {server === "slow" && (
           <p className="mt-3 text-xs text-amber-700">
@@ -126,7 +154,10 @@ export default function Landing() {
         {server === "down" && (
           <p className="mt-3 text-xs text-rose-700">
             The server is taking longer than usual to wake up.{" "}
-            <button className="font-medium underline" onClick={() => (setServer("checking"), setWaited(0), setAttempt((a) => a + 1))}>
+            <button
+              className="font-medium underline"
+              onClick={() => (setServer("checking"), setWaited(0), setAttempt((a) => a + 1))}
+            >
               Try again
             </button>
           </p>
@@ -136,7 +167,7 @@ export default function Landing() {
             <ErrorBox message={error} />
           </div>
         )}
-              <div className="mx-auto mt-10 max-w-4xl">
+        <div className="mx-auto mt-10 max-w-4xl">
           <JudgeAccounts />
         </div>
       </section>
@@ -161,9 +192,21 @@ export default function Landing() {
 
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             {[
-              { icon: RefreshCw, title: "Stays true after approval", text: "New uploads or a GitHub re-sync are read on their own. Approved lines that newer evidence contradicts are flagged, and version 2 shows exactly what changed." },
-              { icon: MessageCircleQuestion, title: "Ask Baton", text: "The new member asks plain questions. Answers quote only evidence they may see, every quote checked word for word. If the files don't say, the leaver is asked." },
-              { icon: Users, title: "Everyone signs in", text: "Invite the person leaving and the person joining with one-time links. Each signs in with their own account; access can be removed at any time." },
+              {
+                icon: RefreshCw,
+                title: "Stays true after approval",
+                text: "New uploads or a GitHub re-sync are read on their own. Approved lines that newer evidence contradicts are flagged, and version 2 shows exactly what changed.",
+              },
+              {
+                icon: MessageCircleQuestion,
+                title: "Ask Baton",
+                text: "The new member asks in their own words. Answers quote only evidence they may see, every quote checked word for word. If the files don't say, the leaver is asked.",
+              },
+              {
+                icon: Users,
+                title: "Everyone signs in",
+                text: "Invite the person leaving and the person joining with one-time links. Each signs in with their own account; access can be removed at any time.",
+              },
             ].map((f) => (
               <div key={f.title} className="rounded-xl border border-slate-200 bg-white p-5">
                 <f.icon className="h-5 w-5 text-brand-600" />
@@ -175,18 +218,24 @@ export default function Landing() {
 
           <div className="mt-8 grid items-center gap-5 rounded-xl border border-brand-100 bg-white p-6 shadow-sm md:grid-cols-[1fr_auto]">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-brand-600">Worked example</div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-brand-600">The demo project</div>
               <h3 className="mt-1 text-lg font-semibold text-slate-900">EventApp: Riya is leaving, Karan is taking over</h3>
               <p className="mt-1 text-sm text-slate-600">
-                A ready-made synthetic college-club project with 7 sources: meeting notes, a task board, GitHub activity, a runbook,
-                Riya's own notes, restricted sponsor notes and a WhatsApp chat. It already contains a wrong task status, a decision
-                that was later reversed, and an invented quote, so you can watch Baton catch each one. Switch between Priya (reviewer),
-                Riya (leaving) and Karan (joining) to see how each person's view differs.
+                A synthetic college-club project with 7 sources: meeting notes, a task board, GitHub activity, a runbook, Riya's
+                own notes, restricted sponsor notes and a WhatsApp chat. It contains a wrong task status, a decision that was
+                later reversed and an invented quote, and you can see how Baton caught each one. Switch between Priya (reviewer),
+                Riya (leaving) and Karan (joining) at the top of the page. Press <b>Start over</b> on its overview to watch the
+                analysis run.
               </p>
             </div>
-            <Button variant="secondary" onClick={demo} loading={busy === "demo"} disabled={!!busy} className="px-5 py-2.5">
-              Open the example <ArrowRight className="h-4 w-4" />
-            </Button>
+            <div className="flex flex-col gap-2">
+              <Button onClick={() => demo("reviewer")} loading={busy === "demo"} disabled={!!busy} className="px-5 py-2.5">
+                Open as the reviewer <ArrowRight className="h-4 w-4" />
+              </Button>
+              <Button variant="secondary" onClick={() => demo("incoming")} loading={busy === "demo-new"} disabled={!!busy}>
+                Open as the new member
+              </Button>
+            </div>
           </div>
         </div>
       </section>
@@ -195,13 +244,13 @@ export default function Landing() {
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">Not a summary. A handover you can audit.</h2>
           <p className="mt-3 text-slate-600">
-            AI summaries sound equally sure about everything. Baton treats every AI output as a claim to be proven: if the quote
-            isn't in the cited source, the claim never reaches the handover.
+            AI summaries sound equally sure about everything. Baton treats every AI output as something to prove: if the quote
+            isn't in the cited source, the statement never reaches the handover.
           </p>
           <ul className="mt-5 space-y-2 text-sm text-slate-700">
             {[
               "Quote check in plain code — the quote must appear word for word; altered quotes are rejected",
-              "Separate support check: does the quote actually back the claim?",
+              "Separate support check: does the quote actually back the statement?",
               "Conflicting sources shown side by side until a person decides",
               "Missing owners and reasons become questions for the person leaving",
               "Team / Leads / Restricted labels enforced in every database query",
@@ -216,12 +265,11 @@ export default function Landing() {
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="text-xs font-medium uppercase tracking-wider text-slate-400">Example handover line</div>
           <p className="mt-3 font-medium text-slate-900">
-            Online payments stay disabled with <code className="rounded bg-slate-100 px-1">PAYMENTS_ENABLED</code> until the sponsor
-            MoU is signed.
+            Online payments stay disabled with <code className="rounded bg-slate-100 px-1">PAYMENTS_ENABLED</code> until the
+            sponsor MoU is signed.
           </p>
           <div className="mt-2 flex gap-2">
-            <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-medium text-white">Corroborated</span>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">2 sources</span>
+            <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-medium text-white">Backed by 2 sources</span>
           </div>
           <div className="mt-4 space-y-2 text-sm">
             <div className="rounded-lg bg-slate-50 p-3">
@@ -230,7 +278,41 @@ export default function Landing() {
             </div>
             <div className="rounded-lg bg-slate-50 p-3">
               <div className="text-xs text-slate-500">github-export · PR #87 · riya-dev</div>
-              Dropping Razorpay for now. <mark className="hl">The sponsor asked us to pause payments until the MoU is signed.</mark>
+              Dropping Razorpay for now.{" "}
+              <mark className="hl">The sponsor asked us to pause payments until the MoU is signed.</mark>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="privacy" className="border-t border-slate-100 bg-slate-50 py-14">
+        <div className="mx-auto max-w-4xl px-5">
+          <h2 className="text-2xl font-semibold text-slate-900">Your data, and what the AI sees</h2>
+          <div className="mt-5 grid gap-4 text-sm text-slate-700 md:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 bg-white p-5">
+              <div className="font-semibold text-slate-900">Sent to Google Gemini</div>
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                <li>
+                  The text of uploaded files, after secrets and phone numbers are removed, including files marked Restricted.
+                </li>
+                <li>
+                  Photos and scanned pages, as images, so they can be read. Text inside an image can't be redacted before that.
+                </li>
+                <li>Questions asked in Ask Baton, with the evidence the asker is allowed to see.</li>
+              </ul>
+              <p className="mt-2 text-xs text-slate-500">
+                Baton uses Google's Gemini API under Google's API terms. Don't upload anything your organisation doesn't allow to
+                be processed that way.
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-5">
+              <div className="font-semibold text-slate-900">Kept by Baton, and how to remove it</div>
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                <li>Original files are not stored: only the redacted text, split into numbered evidence.</li>
+                <li>Delete a file and its quotes are removed everywhere, including approved handovers and answers.</li>
+                <li>Delete a project, or your whole account, from the app at any time.</li>
+                <li>Access labels are checked on every request, not just hidden in the interface.</li>
+              </ul>
             </div>
           </div>
         </div>

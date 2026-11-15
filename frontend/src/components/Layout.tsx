@@ -5,6 +5,8 @@ import {
   GitCompareArrows,
   LayoutDashboard,
   ListChecks,
+  Menu,
+  X,
   MessageCircleQuestion,
   ScrollText,
   Search,
@@ -25,8 +27,8 @@ const NAV = [
   { to: "", label: "Overview", icon: LayoutDashboard, need: "any" },
   { to: "sources", label: "Sources", icon: FileStack, need: "working" },
   { to: "evidence", label: "Evidence", icon: Search, need: "working" },
-  { to: "claims", label: "Claims", icon: ListChecks, need: "working" },
-  { to: "gaps", label: "Gaps & Conflicts", icon: GitCompareArrows, need: "working" },
+  { to: "claims", label: "Findings", icon: ListChecks, need: "working" },
+  { to: "gaps", label: "Questions", icon: GitCompareArrows, need: "working" },
   { to: "review", label: "Review", icon: ClipboardCheck, need: "review" },
   { to: "handover", label: "Handover", icon: Send, need: "any" },
   { to: "ask", label: "Ask Baton", icon: MessageCircleQuestion, need: "any" },
@@ -39,6 +41,7 @@ export default function Layout() {
   const nav = useNavigate();
   const { data, error, loading, reload } = useApi(() => api.get<Overview>(`/projects/${pid}`), [pid, me?.user?.id]);
   const [switching, setSwitching] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // People named or invited since sign-in become previewable: keep the session's list fresh.
   const memberKey = (data?.members ?? []).map((m) => m.user_id + m.status).join(",");
@@ -86,21 +89,33 @@ export default function Layout() {
   return (
     <div className="min-h-screen lg:flex">
       <aside className="no-print border-b border-slate-200 bg-white lg:fixed lg:inset-y-0 lg:w-60 lg:border-b-0 lg:border-r">
-        <div className="flex items-center justify-between px-4 py-4 lg:block">
-          <Link to="/" className="flex items-center gap-2">
-            <Logo />
-          </Link>
+        <div className="flex items-center justify-between px-4 py-3 lg:block lg:py-4">
+          <div className="flex items-center gap-2">
+            <button
+              className="-ml-1 rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 lg:hidden"
+              onClick={() => setMenuOpen((o) => !o)}
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={menuOpen}
+              data-guide="mobile-menu"
+            >
+              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+            <Link to="/" className="flex items-center gap-2">
+              <Logo />
+            </Link>
+          </div>
           <Link to="/projects" className="text-xs text-slate-500 hover:text-slate-800 lg:mt-3 lg:block">
             ← All projects
           </Link>
         </div>
-        <nav className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:overflow-visible">
+        <nav className={cx("flex-col gap-1 px-3 pb-3 lg:flex", menuOpen ? "flex" : "hidden")} aria-label="Project">
           {NAV.filter((n) => allowed(n.need)).map((n) => (
             <NavLink
               key={n.to}
               to={`/p/${pid}${n.to ? "/" + n.to : ""}`}
               end={n.to === ""}
               data-guide={`nav-${n.to || "overview"}`}
+              onClick={() => setMenuOpen(false)}
               className={({ isActive }) =>
                 cx(
                   "flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition",
@@ -125,7 +140,7 @@ export default function Layout() {
         <header className="no-print sticky top-0 z-30 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur sm:px-8">
           <div className="flex min-w-0 items-center gap-2">
             <span className="truncate font-semibold text-slate-900">{data?.project.name ?? "…"}</span>
-            {data?.project.is_demo && <Pill className="bg-amber-100 text-amber-800">Synthetic demo</Pill>}
+            {data?.project.is_demo && <Pill className="bg-amber-100 text-amber-800">Demo · your private copy</Pill>}
           </div>
           <div className="flex min-w-0 flex-wrap items-center gap-3">
             {data && options.length > 1 && (
@@ -160,8 +175,15 @@ export default function Layout() {
         {me.previewing && data && (
           <div className="no-print border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 sm:px-8">
             You're previewing what <b>{data.me.name}</b> sees. They haven't joined yet; anything you do here is logged as{" "}
-            <b>{me.real_user?.name} (previewing as {data.me.name})</b>.{" "}
-            <button className="font-medium underline" disabled={switching} onClick={() => me.real_user && onSwitch(me.real_user.id)}>
+            <b>
+              {me.real_user?.name} (previewing as {data.me.name})
+            </b>
+            .{" "}
+            <button
+              className="font-medium underline"
+              disabled={switching}
+              onClick={() => me.real_user && onSwitch(me.real_user.id)}
+            >
               Back to me
             </button>
           </div>

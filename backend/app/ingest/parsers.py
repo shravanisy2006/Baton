@@ -3,12 +3,13 @@
 Each parser returns ParsedSource(units=[...], meta). A unit is one addressable piece of evidence:
 a paragraph, a bullet, a table row, a CSV row. Small units make quotes precise and easy to verify.
 """
+
 import io
 import re
 from dataclasses import dataclass, field
 
-import pymupdf as fitz  # PyMuPDF
 import pandas as pd
+import pymupdf as fitz  # PyMuPDF
 from docx import Document
 
 MIN_UNIT_CHARS = 12
@@ -44,8 +45,19 @@ class ParseError(Exception):
     pass
 
 
-SUPPORTED = {".pdf": "pdf", ".docx": "docx", ".txt": "txt", ".md": "md", ".markdown": "md", ".csv": "csv",
-             ".json": "json", ".png": "image", ".jpg": "image", ".jpeg": "image", ".webp": "image"}
+SUPPORTED = {
+    ".pdf": "pdf",
+    ".docx": "docx",
+    ".txt": "txt",
+    ".md": "md",
+    ".markdown": "md",
+    ".csv": "csv",
+    ".json": "json",
+    ".png": "image",
+    ".jpg": "image",
+    ".jpeg": "image",
+    ".webp": "image",
+}
 IMAGE_MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
 MAX_OCR_PAGES = 8
 
@@ -220,7 +232,7 @@ def parse_docx(data: bytes, filename: str) -> ParsedSource:
         header = [c.text.strip() for c in rows[0].cells]
         for r_no, row in enumerate(rows[1:], start=1):
             cells = [c.text.strip() for c in row.cells]
-            text = " | ".join(f"{h}: {v}" if h else v for h, v in zip(header, cells) if v)
+            text = " | ".join(f"{h}: {v}" if h else v for h, v in zip(header, cells, strict=False) if v)
             if len(text) >= MIN_UNIT_CHARS:
                 out.units.append(Unit(kind="table_row", text=text, location={"table": t_no, "row": r_no}))
     return out

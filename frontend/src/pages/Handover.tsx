@@ -1,10 +1,35 @@
-import { AlertTriangle, CheckCircle2, Download, ExternalLink, FileCheck2, GitCompare, Lock, Send, ShieldCheck, Sparkles } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Download,
+  ExternalLink,
+  FileCheck2,
+  GitCompare,
+  Lock,
+  Send,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 import { Fragment, useState } from "react";
 import { api, ApiError, downloadFile } from "../lib/api";
 import { useApi } from "../lib/hooks";
 import { ROLE_LABEL, useProject } from "../lib/session";
 import type { Evidence, Handover, HandoverDiff, HandoverEvidence, HandoverItem } from "../lib/types";
-import { Button, Card, ConfidenceBadge, cx, Drawer, Empty, ErrorBox, Highlighted, LabelBadge, Notice, PageHeader, Pill, Spinner } from "../components/ui";
+import {
+  Button,
+  Card,
+  ConfidenceBadge,
+  cx,
+  Drawer,
+  Empty,
+  ErrorBox,
+  Highlighted,
+  LabelBadge,
+  Notice,
+  PageHeader,
+  Pill,
+  Spinner,
+} from "../components/ui";
 import { locationText } from "./Evidence";
 
 export default function HandoverPage() {
@@ -40,18 +65,28 @@ export default function HandoverPage() {
         subtitle={
           d
             ? `For ${d.content.incoming ?? "the incoming member"}, from ${d.content.departing ?? "the departing member"}. Every line links to the evidence behind it.`
-            : "The handover is built only from approved claims, then shared after a reviewer approves it."
+            : "The handover is built only from approved findings, then shared after a reviewer approves it."
         }
         actions={
           <div className="no-print flex flex-wrap gap-2">
             {canReview && (
-              <Button data-guide="generate" variant={d ? "secondary" : "primary"} loading={busy === "gen"} onClick={() => run("gen", () => api.post(`/projects/${pid}/handover/generate`))}>
+              <Button
+                data-guide="generate"
+                variant={d ? "secondary" : "primary"}
+                loading={busy === "gen"}
+                onClick={() => run("gen", () => api.post(`/projects/${pid}/handover/generate`))}
+              >
                 <Sparkles className="h-4 w-4" />{" "}
                 {!d ? "Generate handover" : d.status === "draft" ? "Regenerate draft" : `Make version ${d.version + 1}`}
               </Button>
             )}
             {canReview && d?.status === "draft" && (
-              <Button data-guide="approve-handover" variant="success" loading={busy === "approve"} onClick={() => run("approve", () => api.post(`/handover/${d.id}/approve`))}>
+              <Button
+                data-guide="approve-handover"
+                variant="success"
+                loading={busy === "approve"}
+                onClick={() => run("approve", () => api.post(`/handover/${d.id}/approve`))}
+              >
                 <FileCheck2 className="h-4 w-4" /> Approve & share
               </Button>
             )}
@@ -75,7 +110,7 @@ export default function HandoverPage() {
       {h.loading && <Spinner />}
       {notYet && (
         <Empty icon={<Send className="h-8 w-8" />} title={canReview ? "No handover yet" : "Not shared yet"}>
-          {canReview ? "Approve claims on the Review page, then generate the handover here." : h.error?.message}
+          {canReview ? "Approve findings on the Review page, then generate the handover here." : h.error?.message}
         </Empty>
       )}
       {h.error && !notYet && <ErrorBox message={h.error.message} onRetry={h.reload} />}
@@ -101,12 +136,18 @@ export default function HandoverPage() {
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>
                   Newer evidence has arrived since this version was approved. Lines marked <b>Changed since approval</b> may be
-                  out of date{canReview ? "; settle them, then make the next version" : "; the reviewer is checking them and will share an updated version"}.
+                  out of date
+                  {canReview
+                    ? "; settle them, then make the next version"
+                    : "; the reviewer is checking them and will share an updated version"}
+                  .
                 </span>
               </span>
             </Notice>
           )}
-          {d.diff && (d.diff.total ?? 0) + (d.diff.hidden ?? 0) > 0 && <DiffPanel diff={d.diff} version={d.version} sections={d.content.sections} />}
+          {d.diff && (d.diff.total ?? 0) + (d.diff.hidden ?? 0) > 0 && (
+            <DiffPanel diff={d.diff} version={d.version} sections={d.content.sections} />
+          )}
           {role === "incoming" && d.status === "approved" && d.diff?.base_version && d.acknowledged.length > 0 && (
             <p className="text-xs text-slate-500">
               Sections that didn't change since version {d.diff.base_version} keep your earlier acknowledgement. Only changed
@@ -116,7 +157,8 @@ export default function HandoverPage() {
           {d.content.hidden_count > 0 && (
             <Notice>
               <span className="inline-flex items-center gap-2">
-                <Lock className="h-4 w-4" /> {d.content.hidden_count} item(s) come from sources above your access level and are hidden.
+                <Lock className="h-4 w-4" /> {d.content.hidden_count} item(s) come from sources above your access level and are
+                hidden.
               </span>
             </Notice>
           )}
@@ -138,7 +180,13 @@ export default function HandoverPage() {
                           <CheckCircle2 className="h-4 w-4" /> Acknowledged
                         </span>
                       ) : (
-                        <Button data-guide="ack" size="sm" variant="secondary" loading={busy === s.key} onClick={() => run(s.key, () => api.post(`/handover/${d.id}/ack`, { section: s.key }))}>
+                        <Button
+                          data-guide="ack"
+                          size="sm"
+                          variant="secondary"
+                          loading={busy === s.key}
+                          onClick={() => run(s.key, () => api.post(`/handover/${d.id}/ack`, { section: s.key }))}
+                        >
                           I've read this
                         </Button>
                       )}
@@ -147,7 +195,9 @@ export default function HandoverPage() {
                 </div>
                 {s.note && s.items.length > 0 && <p className="-mt-1 mb-3 text-xs text-slate-500">{s.note}</p>}
                 {s.key === "next" && s.items.length > 0 && (
-                  <p className="-mt-1 mb-3 text-xs text-slate-500">Open work in order of urgency. Click any line to see the evidence behind it.</p>
+                  <p className="-mt-1 mb-3 text-xs text-slate-500">
+                    Open work in order of urgency. Click any line to see the evidence behind it.
+                  </p>
                 )}
                 {s.items.length === 0 ? (
                   <p className="text-sm text-slate-400">Nothing approved for this section.</p>
@@ -182,7 +232,9 @@ function QuoteBox({
   if (!q) return null;
   return (
     <div className={cx("rounded border bg-white p-2", newer ? "border-sky-200" : "border-slate-200")}>
-      <div className={cx("text-[11px] font-semibold uppercase tracking-wide", newer ? "text-sky-700" : "text-slate-500")}>{label}</div>
+      <div className={cx("text-[11px] font-semibold uppercase tracking-wide", newer ? "text-sky-700" : "text-slate-500")}>
+        {label}
+      </div>
       <p className="mt-1 text-xs italic text-slate-800">“{q.quote}”</p>
       <p className="mt-1 text-[11px] text-slate-500">
         <span className="font-mono">{q.code}</span> · {q.source}
@@ -193,7 +245,15 @@ function QuoteBox({
   );
 }
 
-function DiffPanel({ diff, version, sections }: { diff: HandoverDiff; version: number; sections: { key: string; title: string }[] }) {
+function DiffPanel({
+  diff,
+  version,
+  sections,
+}: {
+  diff: HandoverDiff;
+  version: number;
+  sections: { key: string; title: string }[];
+}) {
   const titles = Object.fromEntries(sections.map((s) => [s.key, s.title]));
   const entries = Object.entries(diff.sections ?? {});
   return (
@@ -235,7 +295,9 @@ function DiffPanel({ diff, version, sections }: { diff: HandoverDiff; version: n
                 ))}
                 {part.added.map((x, i) => (
                   <tr key={"a" + i} className="align-top">
-                    <td className="border-b border-slate-100 py-1.5 pr-3 text-xs italic text-slate-400">not in version {diff.base_version}</td>
+                    <td className="border-b border-slate-100 py-1.5 pr-3 text-xs italic text-slate-400">
+                      not in version {diff.base_version}
+                    </td>
                     <td className="border-b border-slate-100 bg-emerald-50/60 py-1.5 pl-3 text-slate-900">{x.text}</td>
                   </tr>
                 ))}
@@ -249,12 +311,31 @@ function DiffPanel({ diff, version, sections }: { diff: HandoverDiff; version: n
 }
 
 export function statusText(s: string) {
-  return ({ todo: "to do", in_progress: "in progress", done: "done", blocked: "blocked", reopened: "reopened", unknown: "unknown" } as Record<string, string>)[s] ?? s;
+  return (
+    (
+      {
+        todo: "to do",
+        in_progress: "in progress",
+        done: "done",
+        blocked: "blocked",
+        reopened: "reopened",
+        unknown: "unknown",
+      } as Record<string, string>
+    )[s] ?? s
+  );
 }
 
 const SOURCE_TYPE: Record<string, string> = {
-  md: "Notes (Markdown)", txt: "Text notes", pdf: "PDF", docx: "Word document", csv: "Task list (CSV)",
-  json: "JSON export", chat: "Chat export", github: "GitHub", attestation: "Departure interview",
+  md: "Notes (Markdown)",
+  txt: "Text notes",
+  pdf: "PDF",
+  docx: "Word document",
+  csv: "Task list (CSV)",
+  json: "JSON export",
+  chat: "Chat export",
+  github: "GitHub",
+  attestation: "Departure interview",
+  image: "Photo or scan",
 };
 
 const CONF_HINT: Record<string, string> = {
@@ -279,7 +360,9 @@ function Item({ it, onOpen }: { it: HandoverItem; onOpen: (i: HandoverItem) => v
         onKeyDown={(e) => clickable && (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onOpen(it))}
         className={
           "rounded-lg border border-slate-100 p-3 transition " +
-          (clickable ? "cursor-pointer hover:border-brand-500/50 hover:bg-brand-50/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" : "")
+          (clickable
+            ? "cursor-pointer hover:border-brand-500/50 hover:bg-brand-50/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            : "")
         }
       >
         {it.changed_since_approval && (
@@ -304,7 +387,9 @@ function Item({ it, onOpen }: { it: HandoverItem; onOpen: (i: HandoverItem) => v
         )}
         <div className="flex flex-wrap items-start gap-2">
           <p className="flex-1 text-sm font-medium text-slate-900">{it.action ?? it.text}</p>
-          {it.change === "added" && <Pill className="bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">New in this version</Pill>}
+          {it.change === "added" && (
+            <Pill className="bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">New in this version</Pill>
+          )}
           {it.change === "changed" && <Pill className="bg-sky-50 text-sky-700 ring-1 ring-sky-200">Updated in this version</Pill>}
           <ConfidenceBadge value={it.confidence} />
           {it.review_state === "corrected" && <Pill className="bg-sky-50 text-sky-700 ring-1 ring-sky-200">Corrected</Pill>}
@@ -320,13 +405,22 @@ function Item({ it, onOpen }: { it: HandoverItem; onOpen: (i: HandoverItem) => v
           )}
           {it.rationale && !it.action && <span>Why: {it.rationale}</span>}
         </div>
-        {it.leaver_note && <p className="mt-2 rounded bg-violet-50 px-2 py-1.5 text-xs text-violet-800">Leaver-attested: {it.leaver_note}</p>}
-        {it.open_gap && <p className="mt-2 rounded bg-amber-50 px-2 py-1.5 text-xs text-amber-800">Still unknown: {it.open_gap}</p>}
-        {it.type === "gap" && <p className="mt-1 text-xs text-slate-500">Not found in authorised sources and not yet answered.</p>}
+        {it.leaver_note && (
+          <p className="mt-2 rounded bg-violet-50 px-2 py-1.5 text-xs text-violet-800">The leaver says: {it.leaver_note}</p>
+        )}
+        {it.open_gap && (
+          <p className="mt-2 rounded bg-amber-50 px-2 py-1.5 text-xs text-amber-800">Still unknown: {it.open_gap}</p>
+        )}
+        {it.type === "gap" && (
+          <p className="mt-1 text-xs text-slate-500">Not found in authorised sources and not yet answered.</p>
+        )}
         {it.evidence.length > 0 && (
           <div className="no-print mt-2 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
             {it.evidence.map((e) => (
-              <span key={e.evidence_id + e.quote} className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5">
+              <span
+                key={e.evidence_id + e.quote}
+                className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5"
+              >
                 <span className="font-mono">{e.code}</span> {e.source}
               </span>
             ))}
@@ -349,7 +443,9 @@ function EvidenceDrawer({ it }: { it: HandoverItem }) {
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <ConfidenceBadge value={it.confidence} />
           {it.code && <span className="font-mono text-xs text-slate-400">{it.code}</span>}
-          {it.review_state === "corrected" && <Pill className="bg-sky-50 text-sky-700 ring-1 ring-sky-200">Corrected by reviewer</Pill>}
+          {it.review_state === "corrected" && (
+            <Pill className="bg-sky-50 text-sky-700 ring-1 ring-sky-200">Corrected by reviewer</Pill>
+          )}
         </div>
         <p className="mt-2 text-sm text-slate-600">{CONF_HINT[it.confidence] ?? ""}</p>
         {it.reviewer_note && <p className="mt-1 text-xs text-sky-700">Reviewer note: {it.reviewer_note}</p>}
@@ -407,7 +503,12 @@ function EvidenceCard({ ev }: { ev: HandoverEvidence }) {
         </p>
       )}
       {ev.url && (
-        <a href={String(ev.url)} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-brand-600 hover:underline">
+        <a
+          href={String(ev.url)}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-2 inline-flex items-center gap-1 text-xs text-brand-600 hover:underline"
+        >
           Open original <ExternalLink className="h-3 w-3" />
         </a>
       )}

@@ -5,6 +5,7 @@
 - JSON exports: GitHub issues/PRs (REST API or `gh issue list --json`), Slack channel exports,
   Discord exports (DiscordChatExporter), or any list of records.
 """
+
 import json
 import re
 from datetime import datetime, timezone
@@ -15,9 +16,14 @@ MAX_RECORDS = 2000
 
 _CHAT_PATTERNS = [
     # WhatsApp Android: 28/10/2026, 18:04 - Priya Nair: message
-    re.compile(r"^(?P<d>\d{1,2}/\d{1,2}/\d{2,4}),? (?P<t>\d{1,2}:\d{2}(?::\d{2})?(?:\s?[APap][Mm])?) - (?P<who>[^:]{1,60}): (?P<msg>.*)$"),
+    re.compile(
+        r"^(?P<d>\d{1,2}/\d{1,2}/\d{2,4}),? (?P<t>\d{1,2}:\d{2}(?::\d{2})?(?:\s?[APap][Mm])?) - (?P<who>[^:]{1,60}): (?P<msg>.*)$"
+    ),
     # WhatsApp iOS: [28/10/26, 18:04:12] Priya Nair: message
-    re.compile(r"^\[(?P<d>\d{1,2}/\d{1,2}/\d{2,4}),? (?P<t>\d{1,2}:\d{2}(?::\d{2})?(?:\s?[APap][Mm])?)\] (?P<who>[^:]{1,60}): (?P<msg>.*)$"),
+    re.compile(
+        r"^\[(?P<d>\d{1,2}/\d{1,2}/\d{2,4}),? (?P<t>\d{1,2}:\d{2}(?::\d{2})?(?:\s?[APap][Mm])?)\] "
+        r"(?P<who>[^:]{1,60}): (?P<msg>.*)$"
+    ),
     # ISO style: [2026-10-28 18:04] Priya: message   or   2026-10-28 18:04 Priya: message
     re.compile(r"^\[?(?P<d>\d{4}-\d{2}-\d{2})[ T](?P<t>\d{1,2}:\d{2}(?::\d{2})?)\]? (?P<who>[^:]{1,60}): (?P<msg>.*)$"),
 ]
@@ -34,7 +40,9 @@ def _iso(d: str, t: str) -> str | None:
             a, b = int(a), int(b)
             dd, mm = (b, a) if b > 12 else (a, b)  # day/month by default; month/day if it can't be a month
             day = datetime(y, mm, dd)
-        clock = datetime.strptime(t.replace(" ", ""), "%I:%M%p" if t.endswith("M") else "%H:%M:%S" if t.count(":") == 2 else "%H:%M")
+        clock = datetime.strptime(
+            t.replace(" ", ""), "%I:%M%p" if t.endswith("M") else "%H:%M:%S" if t.count(":") == 2 else "%H:%M"
+        )
         return f"{day:%Y-%m-%d} {clock:%H:%M}"
     except ValueError:
         return None
@@ -57,8 +65,15 @@ def parse_chat(text: str) -> ParsedSource:
         nonlocal current, n
         if current and len(current["msg"].strip()) >= MIN_UNIT_CHARS and "<Media omitted>" not in current["msg"]:
             n += 1
-            out.units.append(Unit(kind="chat_message", text=current["msg"].strip()[:1500], author=current["who"],
-                                  occurred_at=current["at"], location={"message": n, "time": current["at"]}))
+            out.units.append(
+                Unit(
+                    kind="chat_message",
+                    text=current["msg"].strip()[:1500],
+                    author=current["who"],
+                    occurred_at=current["at"],
+                    location={"message": n, "time": current["at"]},
+                )
+            )
         elif current:
             out.skipped.append(f"short message from {current['who']}")
         current = None
@@ -76,6 +91,7 @@ def parse_chat(text: str) -> ParsedSource:
 
 
 # ---------- JSON ----------
+
 
 def _get(obj: dict, *paths: str):
     for path in paths:
@@ -119,11 +135,15 @@ def _issue_units(rec: dict) -> list[Unit]:
     body = (rec.get("body") or "").strip()
     url = rec.get("html_url") or rec.get("url")
     label = "Pull request" if is_pr else "Issue"
-    units = [Unit(kind="github_pr" if is_pr else "github_issue",
-                  text=(f"{label} #{number} [{state}]: {rec.get('title', '')}" + (f" — {body}" if body else ""))[:1500],
-                  author=_get(rec, "user.login", "author.login", "author.name", "author"),
-                  occurred_at=_date(_get(rec, "updated_at", "updatedAt", "created_at", "createdAt")),
-                  location={"number": number, "url": url})]
+    units = [
+        Unit(
+            kind="github_pr" if is_pr else "github_issue",
+            text=(f"{label} #{number} [{state}]: {rec.get('title', '')}" + (f" — {body}" if body else ""))[:1500],
+            author=_get(rec, "user.login", "author.login", "author.name", "author"),
+            occurred_at=_date(_get(rec, "updated_at", "updatedAt", "created_at", "createdAt")),
+            location={"number": number, "url": url},
+        )
+    ]
     comments = rec.get("comments")
     if isinstance(comments, dict):
         comments = comments.get("nodes") or comments.get("edges") or []
@@ -133,10 +153,15 @@ def _issue_units(rec: dict) -> list[Unit]:
         c = c.get("node", c)
         cbody = (c.get("body") or "").strip()
         if len(cbody) >= MIN_UNIT_CHARS:
-            units.append(Unit(kind="github_comment", text=f"Comment on #{number}: {cbody}"[:1500],
-                              author=_get(c, "user.login", "author.login", "author"),
-                              occurred_at=_date(_get(c, "created_at", "createdAt")),
-                              location={"number": number, "url": c.get("html_url") or c.get("url") or url}))
+            units.append(
+                Unit(
+                    kind="github_comment",
+                    text=f"Comment on #{number}: {cbody}"[:1500],
+                    author=_get(c, "user.login", "author.login", "author"),
+                    occurred_at=_date(_get(c, "created_at", "createdAt")),
+                    location={"number": number, "url": c.get("html_url") or c.get("url") or url},
+                )
+            )
     return units
 
 
@@ -157,16 +182,28 @@ def parse_json(data: bytes) -> ParsedSource:
         if kind == "discord" or ("content" in rec and isinstance(rec.get("author"), dict)):
             text = (rec.get("content") or "").strip()
             if len(text) >= MIN_UNIT_CHARS:
-                out.units.append(Unit(kind="chat_message", text=text[:1500],
-                                      author=_get(rec, "author.nickname", "author.name"),
-                                      occurred_at=_date(rec.get("timestamp")), location={"message": i}))
+                out.units.append(
+                    Unit(
+                        kind="chat_message",
+                        text=text[:1500],
+                        author=_get(rec, "author.nickname", "author.name"),
+                        occurred_at=_date(rec.get("timestamp")),
+                        location={"message": i},
+                    )
+                )
             continue
         if "text" in rec and ("ts" in rec or rec.get("type") == "message"):  # Slack export
             text = (rec.get("text") or "").strip()
             if len(text) >= MIN_UNIT_CHARS:
-                out.units.append(Unit(kind="chat_message", text=text[:1500],
-                                      author=_get(rec, "user_profile.real_name", "user_name", "user"),
-                                      occurred_at=_date(rec.get("ts")), location={"message": i}))
+                out.units.append(
+                    Unit(
+                        kind="chat_message",
+                        text=text[:1500],
+                        author=_get(rec, "user_profile.real_name", "user_name", "user"),
+                        occurred_at=_date(rec.get("ts")),
+                        location={"message": i},
+                    )
+                )
             continue
         # Any other record: its simple fields, "key: value | ...".
         pairs = [f"{k}: {v}" for k, v in rec.items() if isinstance(v, (str, int, float, bool)) and str(v).strip()]
@@ -174,7 +211,9 @@ def parse_json(data: bytes) -> ParsedSource:
         if len(text) < MIN_UNIT_CHARS:
             out.skipped.append(f"record {i}: empty")
             continue
-        author = next((str(rec[k]) for k in ("author", "owner", "assignee", "user", "created_by") if isinstance(rec.get(k), str)), None)
+        author = next(
+            (str(rec[k]) for k in ("author", "owner", "assignee", "user", "created_by") if isinstance(rec.get(k), str)), None
+        )
         when = next((_date(rec[k]) for k in rec if re.search(r"date|time|created|updated", k, re.I) and _date(rec[k])), None)
         out.units.append(Unit(kind="json_record", text=text[:1500], author=author, occurred_at=when, location={"record": i}))
     if len(records) > MAX_RECORDS:

@@ -1,10 +1,26 @@
-import { ArrowRight, Check, Copy, Link2, Loader2, Mail, Play, RefreshCw, RotateCcw, UserMinus, UserPlus } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  CircleDot,
+  Copy,
+  Link2,
+  Loader2,
+  Mail,
+  Play,
+  RefreshCw,
+  RotateCcw,
+  Trash2,
+  UserMinus,
+  UserPlus,
+} from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { usePolling } from "../lib/hooks";
 import { ROLE_LABEL, useProject } from "../lib/session";
-import { Button, Card, cx, ErrorBox, input, Modal, Notice, PageHeader, Pill, select, Stat } from "../components/ui";
+import { Button, Card, cx, ErrorBox, input, Modal, Notice, PageHeader, Pill, select } from "../components/ui";
+import { useSession } from "../lib/session";
 import type { Invite, Member } from "../lib/types";
 import { API_URL } from "../lib/api";
 
@@ -39,9 +55,12 @@ export default function OverviewPage() {
   const analyse = () => run(() => api.post(`/projects/${o.project.id}/analyse`, { mode: analysed ? "update" : "full" }));
   const checkForChanges = () =>
     run(async () => {
-      const r = await api.post<{ new_evidence: number; synced: { source: string; new_items: number }[]; warnings: string[]; job: unknown }>(
-        `/projects/${o.project.id}/check-for-changes`,
-      );
+      const r = await api.post<{
+        new_evidence: number;
+        synced: { source: string; new_items: number }[];
+        warnings: string[];
+        job: unknown;
+      }>(`/projects/${o.project.id}/check-for-changes`);
       const synced = r.synced.map((x) => `${x.source}: ${x.new_items} new`).join("; ");
       if (!r.job)
         setInfo(
@@ -51,12 +70,16 @@ export default function OverviewPage() {
       if (r.warnings.length) setErr(r.warnings.join(" "));
     });
   const startOver = () => {
-    if (!confirm("Start over re-reads every source and clears all review decisions, conflicts and gaps. The approved handover stays visible until you approve a new one. Continue?"))
+    if (
+      !confirm(
+        "Start over re-reads every file and clears all review decisions, disagreements and questions. The approved handover stays visible until you approve a new one. Continue?",
+      )
+    )
       return;
     run(() => api.post(`/projects/${o.project.id}/analyse`, { mode: "full" }));
   };
 
-  const next = nextStep(role, o, base);
+  const items = attention(role, o, base);
 
   return (
     <div>
@@ -81,7 +104,12 @@ export default function OverviewPage() {
         actions={
           canManage &&
           (!analysed ? (
-            <Button onClick={analyse} loading={starting} disabled={running || o.counts.sources === 0} data-guide="run-analysis-top">
+            <Button
+              onClick={analyse}
+              loading={starting}
+              disabled={running || o.counts.sources === 0}
+              data-guide="run-analysis-top"
+            >
               <Play className="h-4 w-4" /> Run analysis
             </Button>
           ) : (
@@ -95,7 +123,12 @@ export default function OverviewPage() {
                   <RefreshCw className="h-4 w-4" /> Check for changes
                 </Button>
               )}
-              <Button variant="secondary" onClick={startOver} disabled={running || starting} title="Re-read everything from scratch">
+              <Button
+                variant="secondary"
+                onClick={startOver}
+                disabled={running || starting}
+                title="Re-read everything from scratch"
+              >
                 <RotateCcw className="h-4 w-4" /> Start over
               </Button>
             </div>
@@ -103,45 +136,54 @@ export default function OverviewPage() {
         }
       />
 
-      {/* Workflow progress */}
-      <div data-guide="progress">
-      <Card className="mb-6 p-4">
-        <ol className="grid gap-3 sm:grid-cols-5">
-          {o.steps.map((s, i) => (
-            <li key={s.key} className="flex items-center gap-3">
-              <span
-                className={cx(
-                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
-                  s.done ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-500",
-                )}
-              >
-                {s.done ? <Check className="h-4 w-4" /> : i + 1}
-              </span>
-              <span className={cx("text-sm font-medium", s.done ? "text-slate-900" : "text-slate-500")}>{s.label}</span>
+      {o.project.is_demo && <DemoBanner />}
+
+      <Card className="mb-6 p-5" data-guide="progress">
+        <h2 className="font-semibold text-slate-900">{items.length ? "What needs your attention" : "All caught up"}</h2>
+        {items.length === 0 && <p className="mt-1 text-sm text-slate-500">{allClear(role, o)}</p>}
+        <ul className="mt-3 space-y-2" data-testid="attention">
+          {items.map((it) => (
+            <li
+              key={it.text}
+              className={cx(
+                "flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2.5 text-sm",
+                it.tone === "urgent"
+                  ? "border-amber-200 bg-amber-50"
+                  : it.tone === "wait"
+                    ? "border-slate-200 bg-slate-50"
+                    : "border-brand-100 bg-brand-50/60",
+              )}
+            >
+              {it.tone === "urgent" ? (
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+              ) : it.tone === "wait" ? (
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-slate-500" />
+              ) : (
+                <CircleDot className="h-4 w-4 shrink-0 text-brand-600" />
+              )}
+              <span className="min-w-0 flex-1 text-slate-800">{it.text}</span>
+              {it.to && (
+                <Link to={it.to} className="inline-flex items-center gap-1 font-medium text-brand-700 hover:underline">
+                  {it.cta} <ArrowRight className="h-4 w-4" />
+                </Link>
+              )}
+            </li>
+          ))}
+        </ul>
+        <ol className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 pt-3" aria-label="Progress">
+          {o.steps.map((st) => (
+            <li key={st.key} className={cx("flex items-center gap-1.5 text-xs", st.done ? "text-emerald-700" : "text-slate-400")}>
+              {st.done ? (
+                <CheckCircle2 className="h-3.5 w-3.5" />
+              ) : (
+                <span className="h-3.5 w-3.5 rounded-full border border-slate-300" />
+              )}
+              {st.label}
             </li>
           ))}
         </ol>
       </Card>
-      </div>
 
-      {next && (
-        <div className="mb-6">
-          <Notice>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span>
-                <b>Next:</b> {next.text}
-              </span>
-              {next.to && (
-                <Link to={next.to} className="inline-flex items-center gap-1 font-medium text-brand-700 hover:underline">
-                  {next.cta} <ArrowRight className="h-4 w-4" />
-                </Link>
-              )}
-            </div>
-          </Notice>
-        </div>
-      )}
-
-      {o.project.is_judge_demo && <JudgeBanner />}
       {err && (
         <div className="mb-4">
           <ErrorBox message={err} />
@@ -155,13 +197,13 @@ export default function OverviewPage() {
       {canManage && o.counts.changed_since_approval > 0 && (
         <div className="mb-4">
           <Notice tone="warn">
-            <b>Living handover:</b> newer evidence affects {o.counts.changed_since_approval} line
-            {o.counts.changed_since_approval === 1 ? "" : "s"} of the approved handover (v{o.handover.approved_version}). They're
-            marked "Changed since approval". Settle them in{" "}
+            <b>The handover is out of date:</b> newer files affect {o.counts.changed_since_approval} line
+            {o.counts.changed_since_approval === 1 ? "" : "s"} of the approved version {o.handover.approved_version}. They're
+            marked "Changed since approval" for everyone. Decide on them in{" "}
             <Link className="font-medium underline" to={`${base}/gaps`}>
-              Gaps & Conflicts
+              Questions
             </Link>
-            , review any new claims, then issue a new version.
+            , review the new findings, then make a new version.
           </Notice>
         </div>
       )}
@@ -169,8 +211,8 @@ export default function OverviewPage() {
       {!o.ai.configured && canManage && (
         <div className="mb-4">
           <Notice tone="warn">
-            The AI provider isn't configured on this server, so new analyses can't run. Previously analysed evidence still
-            works from cache. (Admin: set <code>GEMINI_API_KEY</code>.)
+            The AI isn't set up on this server, so new files can't be analysed. Everything already analysed still works. (Admin:
+            set <code>GEMINI_API_KEY</code>.)
           </Notice>
         </div>
       )}
@@ -180,7 +222,11 @@ export default function OverviewPage() {
           <div className="flex flex-wrap items-center gap-3">
             {running && <Loader2 className="h-4 w-4 animate-spin text-brand-600" />}
             <span className="font-medium text-slate-900">
-              {running ? `Analysing — ${job.stage || "starting"}…` : job.status === "done" ? "Last analysis finished" : "Last analysis failed"}
+              {running
+                ? `Reading the files — ${job.stage || "starting"}…`
+                : job.status === "done"
+                  ? "Last analysis finished"
+                  : "Last analysis didn't finish"}
             </span>
             {job.finished_at && <span className="text-xs text-slate-500">{new Date(job.finished_at).toLocaleString()}</span>}
           </div>
@@ -191,19 +237,28 @@ export default function OverviewPage() {
           )}
           {job.status === "done" && (job.kind === "update" || String(job.stats.mode) === "update") && (
             <p className="mt-2 text-sm text-slate-600">
-              Update run: only new evidence was read; existing claims and review decisions were kept.
-              {job.stats.merged_into_existing ? ` ${job.stats.merged_into_existing} new quote(s) added support to existing claims.` : ""}
+              Only the new files were read; everything you had already reviewed was kept.
+              {job.stats.merged_into_existing
+                ? ` ${job.stats.merged_into_existing} new quote(s) backed up existing findings.`
+                : ""}
               {job.stats.changed_since_approval ? ` ${job.stats.changed_since_approval} approved line(s) changed.` : ""}
             </p>
           )}
           {job.status === "done" && (
             <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-600">
-              <span>{job.stats.evidence_units} evidence pieces read</span>
-              <span>{job.stats.claims} {job.kind === "update" ? "new " : ""}claims extracted</span>
-              <span className="text-emerald-700">{job.stats.verified} verified</span>
-              <span className="text-rose-700">{job.stats.rejected_quotes} quotes rejected by the quote check</span>
-              <span>{job.stats.conflicts} conflicts{job.stats.superseded ? ` (${job.stats.superseded} timeline)` : ""}</span>
-              <span>{job.stats.gaps} gaps</span>
+              <span>{job.stats.evidence_units} pieces of evidence read</span>
+              <span>
+                {job.stats.claims} {job.kind === "update" ? "new " : ""}findings
+              </span>
+              {Number(job.stats.rejected_quotes) > 0 && (
+                <span className="text-rose-700">{job.stats.rejected_quotes} made-up or altered quotes caught</span>
+              )}
+              <span>
+                {job.stats.conflicts} disagreement{job.stats.conflicts === 1 ? "" : "s"}
+              </span>
+              <span>
+                {job.stats.gaps} open question{job.stats.gaps === 1 ? "" : "s"}
+              </span>
             </div>
           )}
           {job.warnings?.length > 0 && (
@@ -216,51 +271,131 @@ export default function OverviewPage() {
         </Card>
       )}
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Sources" value={o.counts.sources} />
-        <Stat label="Evidence pieces" value={o.counts.evidence} />
-        <Stat label="Claims you can see" value={o.counts.claims} />
-        <Stat label="Verified or corroborated" value={o.counts.verified} tone="ok" />
-        <Stat label="Unverified (kept out)" value={o.counts.unverified} tone={o.counts.unverified ? "bad" : undefined} />
-        <Stat label="Waiting for review" value={o.counts.pending_review} tone={o.counts.pending_review ? "warn" : undefined} />
-        <Stat label="Open gaps" value={o.counts.open_gaps} tone={o.counts.open_gaps ? "warn" : undefined} />
-        <Stat label="Open conflicts" value={o.counts.open_conflicts} tone={o.counts.open_conflicts ? "bad" : undefined} />
-      </div>
+      <p className="mb-6 text-sm text-slate-500" data-testid="summary">
+        {o.counts.sources} file{o.counts.sources === 1 ? "" : "s"} · {o.counts.evidence} pieces of evidence · {o.counts.claims}{" "}
+        finding
+        {o.counts.claims === 1 ? "" : "s"} you can see
+        {o.counts.claims > 0 && (
+          <>
+            {" "}
+            ({o.counts.verified} backed by their files
+            {o.counts.unverified ? `, ${o.counts.unverified} not backed and kept out` : ""})
+          </>
+        )}
+      </p>
 
       <Members />
+      {role === "admin" && !o.project.is_demo && <DangerZone />}
     </div>
   );
 }
 
-function nextStep(role: string, o: ReturnType<typeof useProject>["overview"], base: string) {
+type Item = { text: string; to?: string; cta?: string; tone: "urgent" | "todo" | "wait" };
+
+/** Everything that needs doing next, for this person, in the order it should be done. */
+export function attention(role: string, o: ReturnType<typeof useProject>["overview"], base: string): Item[] {
   const job = o.latest_job;
+  const items: Item[] = [];
+  const n = (x: number, one: string, many: string) => `${x} ${x === 1 ? one : many}`;
   if (role === "incoming" || role === "viewer") {
-    return o.handover.approved_version
-      ? { text: "Your approved handover is ready. Questions? Ask Baton answers from the evidence.", to: `${base}/handover`, cta: "Open handover" }
-      : { text: "The reviewer hasn't approved a handover yet. You'll see it here once they do." };
+    if (o.handover.approved_version)
+      items.push({
+        tone: "todo",
+        text: "Your handover is ready. Click any line to see the evidence behind it.",
+        to: `${base}/handover`,
+        cta: "Read handover",
+      });
+    else items.push({ tone: "wait", text: "The reviewer hasn't approved the handover yet. It will appear here." });
+    return items;
   }
   if (role === "departing") {
-    return o.counts.open_gaps
-      ? { text: `There are ${o.counts.open_gaps} questions only you can answer before you leave.`, to: `${base}/gaps`, cta: "Answer questions" }
-      : { text: "No open questions for you right now." };
+    if (o.counts.open_gaps)
+      items.push({
+        tone: "urgent",
+        text: `${n(o.counts.open_gaps, "question", "questions")} only you can answer before you leave.`,
+        to: `${base}/gaps`,
+        cta: "Answer",
+      });
+    return items;
   }
+  if (job?.status === "queued" || job?.status === "running") {
+    items.push({ tone: "wait", text: "Baton is reading the files. This page updates by itself." });
+    return items;
+  }
+  if (job?.status === "failed")
+    items.push({ tone: "urgent", text: "The last analysis didn't finish (details below). Run it again." });
   if (!o.project.departing || !o.project.incoming)
-    return { text: "Add who is leaving and who is taking over (People, at the bottom of this page)." };
-  if (!o.counts.sources) return { text: "Add the project's sources.", to: `${base}/sources`, cta: "Add sources" };
-  if (!job) return { text: "Run the analysis to extract and verify claims (button above)." };
-  if (job.status === "queued" || job.status === "running") return { text: "Analysis is running. This page updates automatically." };
-  if (o.counts.open_conflicts) return { text: `Resolve ${o.counts.open_conflicts} conflicting source(s).`, to: `${base}/gaps`, cta: "See conflicts" };
-  if (o.counts.pending_review) return { text: `Review ${o.counts.pending_review} claims against their evidence.`, to: `${base}/review`, cta: "Start review" };
-  if (o.counts.new_evidence) return { text: `${o.counts.new_evidence} new piece(s) of evidence arrived. Analyse them (button above); review decisions are kept.` };
-  if (!o.handover.approved_version) return { text: "Generate and approve the handover.", to: `${base}/handover`, cta: "Go to handover" };
-  if (o.handover.outdated)
-    return { text: `Things changed since handover v${o.handover.approved_version} was approved. Issue a new version so ${o.project.incoming ?? "the new member"} sees them.`, to: `${base}/handover`, cta: "Update handover" };
-  const notJoined = o.members.find((m) => m.role === "incoming" && m.status === "not_invited");
-  if (!o.project.is_demo && notJoined)
-    return { text: `Handover v${o.handover.approved_version} is approved. Invite ${notJoined.name} (People, below) so they can sign in and read it.` };
+    items.push({ tone: "todo", text: "Add who is leaving and who is taking over (People, below)." });
+  if (!o.counts.sources) {
+    items.push({
+      tone: "todo",
+      text: "Add the project's files: notes, task lists, chats, documents, or a GitHub repo.",
+      to: `${base}/sources`,
+      cta: "Add files",
+    });
+    return items;
+  }
+  if (!job)
+    items.push({ tone: "todo", text: "Run the analysis (button at the top). Baton reads every file and checks every quote." });
+  if (o.counts.new_evidence && job)
+    items.push({
+      tone: "todo",
+      text: `${n(o.counts.new_evidence, "new piece", "new pieces")} of evidence to analyse. Your review decisions are kept.`,
+    });
+  if (o.counts.changed_since_approval)
+    items.push({
+      tone: "urgent",
+      text: `${n(o.counts.changed_since_approval, "approved line has", "approved lines have")} changed since approval.`,
+      to: `${base}/gaps`,
+      cta: "Decide",
+    });
+  if (o.counts.open_conflicts)
+    items.push({
+      tone: "urgent",
+      text: `${n(o.counts.open_conflicts, "place where files disagree", "places where files disagree")}. Pick which is right.`,
+      to: `${base}/gaps`,
+      cta: "Decide",
+    });
+  if (o.counts.pending_review)
+    items.push({
+      tone: "todo",
+      text: `${n(o.counts.pending_review, "finding", "findings")} to check against the highlighted file.`,
+      to: `${base}/review`,
+      cta: "Review",
+    });
+  if (o.counts.open_gaps)
+    items.push({
+      tone: "todo",
+      text: `${n(o.counts.open_gaps, "question is", "questions are")} waiting for ${o.project.departing ?? "the person leaving"}.`,
+      to: `${base}/gaps`,
+      cta: "See questions",
+    });
+  const reviewed = job?.status === "done" && !o.counts.open_conflicts && !o.counts.pending_review;
+  if (reviewed && !o.handover.approved_version)
+    items.push({
+      tone: "todo",
+      text: "Everything is reviewed. Make the handover and approve it.",
+      to: `${base}/handover`,
+      cta: "Make handover",
+    });
+  if (reviewed && o.handover.approved_version && o.handover.outdated)
+    items.push({
+      tone: "todo",
+      text: `Things changed since version ${o.handover.approved_version}. Make version ${o.handover.approved_version + 1} so everyone sees them.`,
+      to: `${base}/handover`,
+      cta: "Update handover",
+    });
+  if (!o.project.is_demo && o.handover.approved_version)
+    for (const m of o.members.filter((x) => (x.role === "incoming" || x.role === "departing") && x.status === "not_invited"))
+      items.push({ tone: "todo", text: `Invite ${m.name} so they can sign in with their own account (People, below).` });
+  return items;
+}
+
+function allClear(role: string, o: ReturnType<typeof useProject>["overview"]): string {
+  if (role === "departing") return "No open questions for you right now. Thank you!";
   if (o.project.is_demo)
-    return { text: `Handover v${o.handover.approved_version} is approved. Switch to the incoming member (top right) to see their view, or try Ask Baton.` };
-  return { text: `Handover v${o.handover.approved_version} is approved. Use "Check for changes" whenever new work happens.` };
+    return `Version ${o.handover.approved_version} is approved. Switch to ${o.project.incoming ?? "the new member"} at the top to see their view, try Ask Baton, or upload the newer note (see the blue box) to see the handover change.`;
+  return `Version ${o.handover.approved_version} is approved and up to date. Press "Check for changes" whenever new work happens.`;
 }
 
 function Members() {
@@ -269,6 +404,7 @@ function Members() {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [invite, setInvite] = useState<(Invite & { name?: string }) | null>(null);
+  const [inviting, setInviting] = useState<Member | null>(null);
   const demo = o.project.is_demo;
 
   async function act(key: string, fn: () => Promise<unknown>) {
@@ -292,11 +428,19 @@ function Members() {
       setForm({ ...form, name: "", handle: "" });
     });
   };
-  const makeInvite = (m: Member) =>
-    act(`inv-${m.user_id}`, async () => setInvite(await api.post<Invite>(`/projects/${o.project.id}/invites`, { user_id: m.user_id })));
+  const makeInvite = (m: Member, email: string) =>
+    act(`inv-${m.user_id}`, async () => {
+      setInvite(await api.post<Invite>(`/projects/${o.project.id}/invites`, { user_id: m.user_id, email: email.trim() || null }));
+      setInviting(null);
+    });
   const revoke = (m: Member) => m.invite && act(`rev-${m.user_id}`, () => api.post(`/invites/${m.invite!.id}/revoke`));
   const remove = (m: Member) => {
-    if (!confirm(`Remove ${m.name}'s access to ${o.project.name}? They won't be able to open it any more. Their past actions stay in the audit log.`)) return;
+    if (
+      !confirm(
+        `Remove ${m.name}'s access to ${o.project.name}? They won't be able to open it any more. Their past actions stay in the audit log.`,
+      )
+    )
+      return;
     act(`rm-${m.user_id}`, () => api.post(`/projects/${o.project.id}/members/${m.user_id}/remove`));
   };
 
@@ -317,7 +461,11 @@ function Members() {
             {!demo && !m.is_you && (
               <Pill
                 className={
-                  m.status === "joined" ? "bg-emerald-50 text-emerald-700" : m.status === "invited" ? "bg-sky-50 text-sky-800" : "bg-slate-100 text-slate-500"
+                  m.status === "joined"
+                    ? "bg-emerald-50 text-emerald-700"
+                    : m.status === "invited"
+                      ? "bg-sky-50 text-sky-800"
+                      : "bg-slate-100 text-slate-500"
                 }
               >
                 {m.status === "joined" ? "Joined" : m.status === "invited" ? "Invite sent" : "Not invited yet"}
@@ -329,7 +477,7 @@ function Members() {
             </span>
             {canManage && !demo && !m.joined && !m.is_you && (
               <span className="flex gap-1.5" data-guide={m.role === "incoming" ? "invite-incoming" : undefined}>
-                <Button size="sm" variant="secondary" loading={busy === `inv-${m.user_id}`} onClick={() => makeInvite(m)}>
+                <Button size="sm" variant="secondary" loading={busy === `inv-${m.user_id}`} onClick={() => setInviting(m)}>
                   <Link2 className="h-3.5 w-3.5" /> {m.status === "invited" ? "New link" : "Invite"}
                 </Button>
                 {m.status === "invited" && (
@@ -340,7 +488,13 @@ function Members() {
               </span>
             )}
             {role === "admin" && !demo && !m.is_you && (
-              <Button size="sm" variant="secondary" loading={busy === `rm-${m.user_id}`} onClick={() => remove(m)} title="Remove access">
+              <Button
+                size="sm"
+                variant="secondary"
+                loading={busy === `rm-${m.user_id}`}
+                onClick={() => remove(m)}
+                title="Remove access"
+              >
                 <UserMinus className="h-3.5 w-3.5" />
               </Button>
             )}
@@ -349,16 +503,37 @@ function Members() {
       </div>
       {role === "admin" && (
         <form onSubmit={add} data-guide="people-form" className="mt-4 grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto_auto]">
-          <input className={input} placeholder="Add someone: name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          <input className={input} placeholder="GitHub handle (optional)" value={form.handle} onChange={(e) => setForm({ ...form, handle: e.target.value })} />
-          <select className={select} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} aria-label="Role">
+          <input
+            className={input}
+            placeholder="Add someone: name"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            required
+          />
+          <input
+            className={input}
+            placeholder="GitHub handle (optional)"
+            value={form.handle}
+            onChange={(e) => setForm({ ...form, handle: e.target.value })}
+          />
+          <select
+            className={select}
+            value={form.role}
+            onChange={(e) => setForm({ ...form, role: e.target.value })}
+            aria-label="Role"
+          >
             {["reviewer", "departing", "incoming", "viewer", "admin"].map((r) => (
               <option key={r} value={r}>
                 {ROLE_LABEL[r]}
               </option>
             ))}
           </select>
-          <select className={select} value={form.access_level} onChange={(e) => setForm({ ...form, access_level: e.target.value })} aria-label="Access level">
+          <select
+            className={select}
+            value={form.access_level}
+            onChange={(e) => setForm({ ...form, access_level: e.target.value })}
+            aria-label="Access level"
+          >
             {["Team", "Leads", "Restricted"].map((l) => (
               <option key={l}>{l}</option>
             ))}
@@ -374,11 +549,77 @@ function Members() {
         </div>
       )}
       <InviteModal invite={invite} onClose={() => setInvite(null)} />
+      {inviting && (
+        <InviteAsk
+          member={inviting}
+          busy={busy === `inv-${inviting.user_id}`}
+          onCancel={() => setInviting(null)}
+          onCreate={(email) => makeInvite(inviting, email)}
+        />
+      )}
     </Card>
   );
 }
 
-function InviteModal({ invite, onClose }: { invite: (Invite & { name?: string; project?: string }) | null; onClose: () => void }) {
+function InviteAsk({
+  member,
+  busy,
+  onCancel,
+  onCreate,
+}: {
+  member: Member;
+  busy: boolean;
+  onCancel: () => void;
+  onCreate: (email: string) => void;
+}) {
+  const { me } = useSession();
+  const [email, setEmail] = useState("");
+  return (
+    <Modal open onClose={onCancel} title={`Invite ${member.name}`}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onCreate(email);
+        }}
+      >
+        <label className="text-sm font-medium text-slate-700" htmlFor="invite-email">
+          Their email address <span className="font-normal text-slate-400">(recommended)</span>
+        </label>
+        <input
+          id="invite-email"
+          type="email"
+          className={input + " mt-1"}
+          placeholder="name@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <p className="mt-2 text-xs text-slate-500">
+          With an email, only someone signed in with that address can use the link
+          {me?.email_configured
+            ? ", and Baton emails it to them."
+            : ". (This server can't send email, so you'll copy the link and send it yourself.)"}{" "}
+          Without one, anyone who has the link can join as {member.name}.
+        </p>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="submit" loading={busy}>
+            <Link2 className="h-4 w-4" /> Create invite link
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function InviteModal({
+  invite,
+  onClose,
+}: {
+  invite: (Invite & { name?: string; project?: string }) | null;
+  onClose: () => void;
+}) {
   const [copied, setCopied] = useState(false);
   if (!invite) return null;
   const url = `${window.location.origin}${invite.path}`;
@@ -394,18 +635,36 @@ function InviteModal({ invite, onClose }: { invite: (Invite & { name?: string; p
   }
   return (
     <Modal open onClose={onClose} title={`Invite ${invite.name}`}>
+      {invite.email_status === "sent" && (
+        <div className="mb-3">
+          <Notice tone="ok">Emailed to {invite.email_hint}. You can also copy the link below.</Notice>
+        </div>
+      )}
+      {invite.email_status === "failed" && (
+        <div className="mb-3">
+          <Notice tone="warn">The email couldn't be sent. Copy the link below and send it yourself.</Notice>
+        </div>
+      )}
       <p className="text-sm text-slate-600">
-        Send this link to {invite.name}. It works once, expires in 14 days, and any earlier link for them stops working.
+        {invite.email_status === "sent" ? "The link" : `Send this link to ${invite.name}. It`} works once, expires in 14 days, and
+        any earlier link for them stops working.
+        {invite.locked_to_email && ` Only someone signed in as ${invite.email_hint} can use it.`}
       </p>
       <div className="mt-3 flex gap-2">
-        <input className={input + " font-mono text-xs"} readOnly value={url} onFocus={(e) => e.target.select()} aria-label="Invite link" />
+        <input
+          className={input + " font-mono text-xs"}
+          readOnly
+          value={url}
+          onFocus={(e) => e.target.select()}
+          aria-label="Invite link"
+        />
         <Button variant="secondary" onClick={copy}>
           <Copy className="h-4 w-4" /> {copied ? "Copied" : "Copy"}
         </Button>
       </div>
       <a
         className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 hover:underline"
-        href={`mailto:${invite.email_hint ?? ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`}
+        href={`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`}
       >
         <Mail className="h-4 w-4" /> Email it from your mail app
       </a>
@@ -416,41 +675,95 @@ function InviteModal({ invite, onClose }: { invite: (Invite & { name?: string; p
   );
 }
 
-function JudgeBanner() {
+function DemoBanner() {
+  const { restartDemo } = useSession();
   const nav = useNavigate();
-  const [state, setState] = useState<"idle" | "building" | "error">("idle");
+  const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  async function reset() {
-    if (!confirm("Reset the shared demo project to its starting state (analysed, reviewed, version 1 approved)? Changes made by anyone will be lost.")) return;
-    setState("building");
+  async function restart() {
+    if (!confirm("Throw away this copy and start again from a fresh one (analysed, reviewed, version 1 approved)?")) return;
+    setBusy(true);
     setMsg(null);
     try {
-      await api.post("/judge-demo/reset");
-      for (let i = 0; i < 60; i++) {
-        await new Promise((r) => setTimeout(r, 3000));
-        const s = await api.get<{ status: string; error: string | null }>("/judge-demo");
-        if (s.status === "ready") return nav("/projects");
-        if (s.status === "failed") throw new Error(s.error ?? "Reset failed.");
-      }
-      throw new Error("Reset is taking longer than expected. Refresh in a minute.");
+      const pid = await restartDemo();
+      nav(`/p/${pid}`);
     } catch (e) {
-      setState("error");
       setMsg((e as Error).message);
+    } finally {
+      setBusy(false);
     }
   }
   return (
     <div className="mb-4">
       <Notice>
-        <b>Shared demo for judges.</b> Already analysed, reviewed and handed over (version 1). Try the living handover:{" "}
+        <b>This is your private demo copy.</b> Nobody else sees it, and it's deleted after 24 hours. To see the handover change:{" "}
         <a className="font-medium underline" href={`${API_URL}/samples/standup-2026-11-12.md`}>
           download the newer standup note
         </a>
-        , upload it on Sources, then press <b>Analyse</b> here. Others may be using this project too.{" "}
-        <button className="font-medium underline" disabled={state === "building"} onClick={reset}>
-          {state === "building" ? "Resetting… (about a minute)" : "Reset to the starting state"}
+        , upload it on Sources, then press <b>Analyse</b> here.{" "}
+        <button className="font-medium underline" disabled={busy} onClick={restart}>
+          {busy ? "Preparing a fresh copy…" : "Start again"}
         </button>
         {msg && <span className="ml-1 text-rose-700">{msg}</span>}
       </Notice>
     </div>
+  );
+}
+
+function DangerZone() {
+  const { overview: o } = useProject();
+  const nav = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  async function del() {
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.post(`/projects/${o.project.id}/delete`, { confirm_name: name });
+      nav("/projects");
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Card className="mt-6 border-rose-200 p-5">
+      <h2 className="font-semibold text-rose-800">Delete this project</h2>
+      <p className="mt-1 text-sm text-slate-600">
+        Permanently deletes the project for everyone: its evidence, findings, handovers, questions and audit log. This can't be
+        undone.
+      </p>
+      <Button variant="danger" className="mt-3" onClick={() => setOpen(true)}>
+        <Trash2 className="h-4 w-4" /> Delete project…
+      </Button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Delete project">
+        <p className="text-sm text-slate-600">
+          Type <b>{o.project.name}</b> to confirm.
+        </p>
+        <input
+          className={input + " mt-3"}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          aria-label="Project name"
+          autoFocus
+        />
+        {err && (
+          <div className="mt-3">
+            <ErrorBox message={err} />
+          </div>
+        )}
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={del} loading={busy} disabled={name.trim() !== o.project.name}>
+            Delete forever
+          </Button>
+        </div>
+      </Modal>
+    </Card>
   );
 }

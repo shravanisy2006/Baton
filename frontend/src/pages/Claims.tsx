@@ -5,7 +5,20 @@ import { useApi } from "../lib/hooks";
 import { useProject } from "../lib/session";
 import type { Claim } from "../lib/types";
 import ClaimDetail from "../components/ClaimDetail";
-import { Card, Check, ConfidenceBadge, Empty, ErrorBox, Modal, PageHeader, select, Spinner, Stat, TypeBadge } from "../components/ui";
+import {
+  Card,
+  Check,
+  CONF,
+  ConfidenceBadge,
+  Empty,
+  ErrorBox,
+  Modal,
+  PageHeader,
+  select,
+  Spinner,
+  Stat,
+  TypeBadge,
+} from "../components/ui";
 
 const TYPES = ["decision", "task", "owner", "blocker", "dependency", "risk", "open_question", "recurring_problem", "contact"];
 const CONFS = ["verified", "corroborated", "weak", "conflicting", "unverified", "leaver_attested", "reviewer_asserted"];
@@ -23,15 +36,19 @@ export default function ClaimsPage() {
   return (
     <div>
       <PageHeader
-        title="Claims & verification"
-        subtitle="Facts the AI proposed from the evidence. Nothing is trusted yet: each claim must pass the quote check (code) and the support check (separate AI call)."
+        title="Findings"
+        subtitle="Everything the AI found in the files: decisions, owners, tasks, risks. Nothing is trusted yet: each one must quote its file word for word, and the quote must back it."
       />
       {all.data && all.data.claims.length > 0 && (
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label="Claims" value={all.data.claims.length} />
-          <Stat label="Passed the quote check" value={counts((c) => c.gate1 === "pass")} tone="ok" />
-          <Stat label="Failed the quote check" value={counts((c) => c.gate1 === "fail")} tone="bad" />
-          <Stat label="Verified or corroborated" value={counts((c) => c.confidence === "verified" || c.confidence === "corroborated")} tone="ok" />
+          <Stat label="Findings" value={all.data.claims.length} />
+          <Stat label="Quote found in its file" value={counts((c) => c.gate1 === "pass")} tone="ok" />
+          <Stat label="Quote not in its file" value={counts((c) => c.gate1 === "fail")} tone="bad" />
+          <Stat
+            label="Backed by their files"
+            value={counts((c) => c.confidence === "verified" || c.confidence === "corroborated")}
+            tone="ok"
+          />
         </div>
       )}
       <div className="mb-4 flex flex-wrap gap-2">
@@ -44,10 +61,10 @@ export default function ClaimsPage() {
           ))}
         </select>
         <select className={select} value={conf} onChange={(e) => setConf(e.target.value)} aria-label="Confidence">
-          <option value="">All confidence labels</option>
+          <option value="">Any backing</option>
           {CONFS.map((c) => (
             <option key={c} value={c}>
-              {c.replace("_", " ")}
+              {CONF[c as keyof typeof CONF].label}
             </option>
           ))}
         </select>
@@ -55,7 +72,7 @@ export default function ClaimsPage() {
       {all.loading && <Spinner />}
       {all.error && <ErrorBox message={all.error.message} onRetry={all.reload} />}
       {all.data && all.data.claims.length === 0 && (
-        <Empty icon={<ListChecks className="h-8 w-8" />} title="No claims yet">
+        <Empty icon={<ListChecks className="h-8 w-8" />} title="No findings yet">
           Run the analysis from the Overview page once sources are added.
         </Empty>
       )}
@@ -98,10 +115,10 @@ export default function ClaimsPage() {
       )}
       {all.data && all.data.hidden_count > 0 && (
         <p className="mt-4 flex items-center gap-2 text-xs text-slate-500">
-          <Lock className="h-3.5 w-3.5" /> {all.data.hidden_count} claim(s) from sources above your access level are hidden.
+          <Lock className="h-3.5 w-3.5" /> {all.data.hidden_count} finding(s) from files above your access level are hidden.
         </p>
       )}
-      <Modal open={!!open} onClose={() => setOpen(null)} title="Claim and its evidence" wide>
+      <Modal open={!!open} onClose={() => setOpen(null)} title="Finding and its evidence" wide>
         {open && <ClaimDetail id={open} />}
       </Modal>
     </div>

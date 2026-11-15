@@ -7,10 +7,10 @@ import { statusText } from "../pages/Handover";
 import { ConfidenceBadge, cx, ErrorBox, Highlighted, LabelBadge, Pill, Spinner, TypeBadge } from "./ui";
 
 const SUPPORT: Record<string, { label: string; cls: string }> = {
-  supports: { label: "Supports the claim", cls: "text-emerald-700" },
-  partial: { label: "Only partly supports it", cls: "text-amber-700" },
-  contradicts: { label: "Contradicts the claim", cls: "text-rose-700" },
-  unrelated: { label: "Doesn't address the claim", cls: "text-rose-700" },
+  supports: { label: "Yes, the quote backs it", cls: "text-emerald-700" },
+  partial: { label: "Only partly", cls: "text-amber-700" },
+  contradicts: { label: "No, the quote says the opposite", cls: "text-rose-700" },
+  unrelated: { label: "No, the quote is about something else", cls: "text-rose-700" },
 };
 
 export function CitationView({ c }: { c: Citation }) {
@@ -27,7 +27,13 @@ export function CitationView({ c }: { c: Citation }) {
         </span>
         <span className="font-mono text-slate-400">{c.cited_code}</span>
       </div>
-      <div className="mb-2 text-sm italic text-slate-600">AI's quote: “{c.quote}”</div>
+      <div className="mb-2 text-sm italic text-slate-600">Quoted by the AI: “{c.quote}”</div>
+      {c.evidence?.flags?.includes("instructions") && (
+        <div className="mb-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+          This text looks like it was written to instruct an AI (for example “ignore previous instructions”). Baton never follows
+          it, and findings based only on it are never marked as backed. Check it carefully.
+        </div>
+      )}
       {c.evidence ? (
         <>
           <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
@@ -55,14 +61,20 @@ export function VerificationSummary({ claim }: { claim: Claim }) {
   return (
     <div className="grid gap-2 sm:grid-cols-2">
       <div className="rounded-lg border border-slate-200 p-3">
-        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Gate 1 · quote check (code)</div>
+        <div className="text-xs font-medium text-slate-500">
+          Check 1 · Is the quote really in the file? <span className="text-slate-400">(checked by code)</span>
+        </div>
         <div className={cx("mt-1 text-sm font-medium", claim.gate1 === "pass" ? "text-emerald-700" : "text-rose-700")}>
-          {claim.gate1 === "pass" ? "Passed — quote found word for word in the cited source" : "Failed — no cited quote appears word for word in its source"}
+          {claim.gate1 === "pass" ? "Yes, word for word" : "No. The AI's quote isn't in the file, so this can't be trusted"}
         </div>
       </div>
       <div className="rounded-lg border border-slate-200 p-3">
-        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Gate 2 · support check (AI)</div>
-        <div className={cx("mt-1 text-sm font-medium", s?.cls ?? "text-slate-500")}>{s?.label ?? (claim.gate1 === "pass" ? "Not checked" : "Skipped (gate 1 failed)")}</div>
+        <div className="text-xs font-medium text-slate-500">
+          Check 2 · Does the quote back the statement? <span className="text-slate-400">(a separate AI check)</span>
+        </div>
+        <div className={cx("mt-1 text-sm font-medium", s?.cls ?? "text-slate-500")}>
+          {s?.label ?? (claim.gate1 === "pass" ? "Not checked yet" : "Skipped, because check 1 failed")}
+        </div>
         {claim.support_reason && <div className="mt-0.5 text-xs text-slate-500">{claim.support_reason}</div>}
       </div>
     </div>
@@ -102,7 +114,11 @@ export function ClaimHeader({ claim }: { claim: Claim }) {
         <p className="mt-1 text-xs text-slate-500">AI's original wording: {claim.original_statement}</p>
       )}
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
-        {claim.status && <span>Status: <b>{statusText(claim.status)}</b></span>}
+        {claim.status && (
+          <span>
+            Status: <b>{statusText(claim.status)}</b>
+          </span>
+        )}
         <span>
           Owner: <b>{claim.owner ?? "not stated"}</b>
           {claim.owner_reassigned && <span className="text-sky-700"> (reassigned by reviewer)</span>}
@@ -111,7 +127,7 @@ export function ClaimHeader({ claim }: { claim: Claim }) {
       </div>
       {claim.leaver_note && (
         <div className="mt-2 rounded-lg bg-violet-50 p-2.5 text-sm text-violet-800">
-          <b>Leaver-attested:</b> {claim.leaver_note}
+          <b>The leaver says:</b> {claim.leaver_note}
         </div>
       )}
       {claim.reviewer_note && <div className="mt-2 text-xs text-sky-700">Reviewer note: {claim.reviewer_note}</div>}
@@ -129,7 +145,9 @@ export default function ClaimDetail({ id }: { id: string }) {
       <ClaimHeader claim={data} />
       <VerificationSummary claim={data} />
       <div className="space-y-2">
-        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Evidence ({data.citations.length})</div>
+        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          Where this comes from ({data.citations.length})
+        </div>
         {data.citations.map((c, i) => (
           <CitationView key={i} c={c} />
         ))}
@@ -138,12 +156,14 @@ export default function ClaimDetail({ id }: { id: string }) {
         <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800">
           {data.conflicts.map((k) => (
             <div key={k.id}>
-              <b>Conflict ({k.status}):</b> {k.explanation}
+              <b>Sources disagree ({k.status === "open" ? "not decided yet" : k.status}):</b> {k.explanation}
             </div>
           ))}
         </div>
       )}
-      <div className="text-xs text-slate-400">Extracted by {data.extractor}</div>
+      <div className="text-xs text-slate-400">
+        Found by {data.extractor.startsWith("cache:") ? `${data.extractor.slice(6)} (saved answer)` : data.extractor}
+      </div>
     </div>
   );
 }

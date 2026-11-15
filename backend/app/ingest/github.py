@@ -1,4 +1,5 @@
 """Read-only GitHub import through the official REST API (issues, pull requests, comments, commits)."""
+
 import re
 
 import httpx
@@ -43,16 +44,14 @@ def fetch_repo(url: str, token: str | None = None) -> tuple[str, ParsedSource]:
     full = f"{owner}/{repo}"
     s = get_settings()
     token = token or s.github_token
-    headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
-               "User-Agent": "baton-handover"}
+    headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "baton-handover"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     limit = s.github_max_items
     out = ParsedSource()
     with httpx.Client(headers=headers, timeout=20) as client:
         _get(client, f"/repos/{full}")
-        issues = _get(client, f"/repos/{full}/issues", state="all", per_page=min(limit, 100),
-                      sort="updated", direction="desc")
+        issues = _get(client, f"/repos/{full}/issues", state="all", per_page=min(limit, 100), sort="updated", direction="desc")
         for it in issues:
             is_pr = "pull_request" in it
             label = "Pull request" if is_pr else "Issue"
@@ -61,30 +60,42 @@ def fetch_repo(url: str, token: str | None = None) -> tuple[str, ParsedSource]:
             if it.get("state_reason") == "reopened":
                 state = "reopened"
             text = f"{label} #{it['number']} [{state}]: {it['title']}" + (f" — {body}" if body else "")
-            out.units.append(Unit(
-                kind="github_pr" if is_pr else "github_issue", text=text[:1500],
-                author=(it.get("user") or {}).get("login"), occurred_at=(it.get("updated_at") or "")[:10] or None,
-                location={"repo": full, "number": it["number"], "url": it.get("html_url")},
-            ))
+            out.units.append(
+                Unit(
+                    kind="github_pr" if is_pr else "github_issue",
+                    text=text[:1500],
+                    author=(it.get("user") or {}).get("login"),
+                    occurred_at=(it.get("updated_at") or "")[:10] or None,
+                    location={"repo": full, "number": it["number"], "url": it.get("html_url")},
+                )
+            )
             if it.get("comments"):
                 for c in _get(client, f"/repos/{full}/issues/{it['number']}/comments", per_page=30):
                     cbody = (c.get("body") or "").strip()
                     if len(cbody) < 12:
                         continue
-                    out.units.append(Unit(
-                        kind="github_comment", text=f"Comment on #{it['number']}: {cbody}"[:1500],
-                        author=(c.get("user") or {}).get("login"), occurred_at=(c.get("created_at") or "")[:10] or None,
-                        location={"repo": full, "number": it["number"], "url": c.get("html_url")},
-                    ))
+                    out.units.append(
+                        Unit(
+                            kind="github_comment",
+                            text=f"Comment on #{it['number']}: {cbody}"[:1500],
+                            author=(c.get("user") or {}).get("login"),
+                            occurred_at=(c.get("created_at") or "")[:10] or None,
+                            location={"repo": full, "number": it["number"], "url": c.get("html_url")},
+                        )
+                    )
         for c in _get(client, f"/repos/{full}/commits", per_page=min(limit, 100)):
             msg = ((c.get("commit") or {}).get("message") or "").strip()
             if len(msg) < 12:
                 continue
             commit = c.get("commit") or {}
             author = (c.get("author") or {}).get("login") or (commit.get("author") or {}).get("name")
-            out.units.append(Unit(
-                kind="github_commit", text=f"Commit {c['sha'][:7]}: {msg}"[:1500], author=author,
-                occurred_at=((commit.get("author") or {}).get("date") or "")[:10] or None,
-                location={"repo": full, "sha": c["sha"][:7], "url": c.get("html_url")},
-            ))
+            out.units.append(
+                Unit(
+                    kind="github_commit",
+                    text=f"Commit {c['sha'][:7]}: {msg}"[:1500],
+                    author=author,
+                    occurred_at=((commit.get("author") or {}).get("date") or "")[:10] or None,
+                    location={"repo": full, "sha": c["sha"][:7], "url": c.get("html_url")},
+                )
+            )
     return full, out

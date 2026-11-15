@@ -31,7 +31,11 @@ export default function SignInPage() {
           <JudgeAccounts compact />
         </div>
         <p className="mt-4 text-center text-xs text-slate-500">
-          Just looking? <Link to="/" className="text-brand-700 hover:underline">Open the worked example</Link> — no account needed.
+          Just looking? Use a demo sign-in above, or{" "}
+          <Link to="/" className="text-brand-700 hover:underline">
+            open the demo
+          </Link>{" "}
+          from the home page. No account needed.
         </p>
       </main>
     </div>

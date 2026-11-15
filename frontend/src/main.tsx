@@ -18,6 +18,7 @@ import NotFound from "./pages/NotFound";
 import SignInPage from "./pages/SignIn";
 import InvitePage from "./pages/Invite";
 import AskPage from "./pages/Ask";
+import { AccountPage, ForgotPasswordPage, ResetPasswordPage, VerifyEmailPage } from "./pages/AccountPages";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -28,6 +29,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="/projects" element={<Projects />} />
           <Route path="/signin" element={<SignInPage />} />
           <Route path="/invite/:token" element={<InvitePage />} />
+          <Route path="/account" element={<AccountPage />} />
+          <Route path="/verify/:token" element={<VerifyEmailPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
           <Route path="/p/:pid" element={<Layout />}>
             <Route index element={<OverviewPage />} />
             <Route path="sources" element={<SourcesPage />} />

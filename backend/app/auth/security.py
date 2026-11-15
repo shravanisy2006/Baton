@@ -6,6 +6,7 @@ they accept an invite and sign in themselves, the reviewer may *preview* as them
 way says so. Project access is decided only by membership, and `require_member` returns the member's access level,
 which filters Team / Leads / Restricted content in every query.
 """
+
 import hashlib
 import hmac
 import secrets
@@ -26,7 +27,7 @@ TOKEN_DAYS = 14
 # ---------- passwords (scrypt, standard library) ----------
 def hash_password(password: str) -> str:
     salt = secrets.token_bytes(16)
-    digest = hashlib.scrypt(password.encode(), salt=salt, n=2 ** 14, r=8, p=1, dklen=32)
+    digest = hashlib.scrypt(password.encode(), salt=salt, n=2**14, r=8, p=1, dklen=32)
     return f"scrypt${salt.hex()}${digest.hex()}"
 
 
@@ -34,12 +35,15 @@ def check_password(password: str, stored: str | None) -> bool:
     if not stored or not stored.startswith("scrypt$"):
         return False
     _, salt, digest = stored.split("$")
-    test = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=2 ** 14, r=8, p=1, dklen=32)
+    test = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=2**14, r=8, p=1, dklen=32)
     return hmac.compare_digest(test.hex(), digest)
 
 
-def make_token(account_id: str, user_id: str | None, via: str | None = None) -> str:
+def make_token(account_id: str, user_id: str | None, via: str | None = None, sv: int = 0) -> str:
+    """`sv` is the signed-in person's session_version: bumping it (sign out everywhere, password change,
+    account deletion) invalidates every token issued before."""
     payload = {
+        "sv": sv,
         "acc": account_id,
         "sub": user_id,
         "exp": datetime.now(timezone.utc) + timedelta(days=TOKEN_DAYS),
@@ -80,6 +84,9 @@ def current_session(authorization: str = Header(default=""), db: Session = Depen
     if user and user.account_id != account.id:
         raise HTTPException(401, "Invalid session.")
     via = db.get(User, data["via"]) if data.get("via") else None
+    real = via or user
+    if real and (real.deleted_at or int(data.get("sv", 0)) != (real.session_version or 0)):
+        raise HTTPException(401, "You were signed out. Please sign in again.")
     if user and user.merged_into:
         # This person has since joined with their own account: previews of them end here.
         if via:
@@ -110,10 +117,19 @@ class Member:
         return self.membership.access_level
 
 
+def token_for(user: User, via: User | None = None) -> str:
+    """A fresh session token for `user` (previewed by `via`), carrying the signed-in person's session version."""
+    real = via or user
+    return make_token(user.account_id, user.id, via.id if via else None, real.session_version or 0)
+
+
 def require_member(db: Session, project_id: str, session: Session_, roles: tuple[str, ...] | None = None) -> Member:
     project = db.get(Project, project_id)
-    m = (db.query(Membership).filter_by(project_id=project_id, user_id=session.user.id).first()
-         if project and session.user else None)
+    m = (
+        db.query(Membership).filter_by(project_id=project_id, user_id=session.user.id).first()
+        if project and session.user
+        else None
+    )
     # Same 404 whether the project is missing or you aren't in it: no existence leaks.
     if not m:
         raise HTTPException(404, "Project not found, or you don't have access to it.")

@@ -44,7 +44,10 @@ async function request<T>(method: string, path: string, body?: unknown, isForm =
       body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError(0, "Can't reach the Baton server. The free server may be waking up or updating (up to a minute) — please try again shortly.");
+    throw new ApiError(
+      0,
+      "Can't reach the Baton server. The free server may be waking up or updating (up to a minute) — please try again shortly.",
+    );
   }
   if (!res.ok) {
     let msg = `Request failed (${res.status})`;
@@ -61,9 +64,9 @@ async function request<T>(method: string, path: string, body?: unknown, isForm =
 }
 
 export const api = {
-  get: <T,>(p: string) => request<T>("GET", p),
-  post: <T,>(p: string, body?: unknown) => request<T>("POST", p, body ?? {}),
-  upload: <T,>(p: string, form: FormData) => request<T>("POST", p, form, true),
+  get: <T>(p: string) => request<T>("GET", p),
+  post: <T>(p: string, body?: unknown) => request<T>("POST", p, body ?? {}),
+  upload: <T>(p: string, form: FormData) => request<T>("POST", p, form, true),
 };
 
 /** Download a file the API generates (e.g. the handover PDF), with the session token. */

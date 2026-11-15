@@ -14,18 +14,22 @@ router = APIRouter(tags=["handover"])
 
 
 def version_out(v: HandoverVersion) -> dict:
-    return {"id": v.id, "version": v.version, "status": v.status,
-            "created_at": v.created_at.isoformat(),
-            "approved_at": v.approved_at.isoformat() if v.approved_at else None,
-            "approved_by": v.approved_by, "changes": (v.diff or {}).get("total"),
-            "base_version": (v.diff or {}).get("base_version")}
+    return {
+        "id": v.id,
+        "version": v.version,
+        "status": v.status,
+        "created_at": v.created_at.isoformat(),
+        "approved_at": v.approved_at.isoformat() if v.approved_at else None,
+        "approved_by": v.approved_by,
+        "changes": (v.diff or {}).get("total"),
+        "base_version": (v.diff or {}).get("base_version"),
+    }
 
 
 @router.post("/projects/{project_id}/handover/generate")
 def generate(project_id: str, s=Depends(current_session), db: Session = Depends(get_db)):
     m = require_member(db, project_id, s, CAN_REVIEW)
-    approved = db.query(Claim).filter(Claim.project_id == project_id,
-                                      Claim.review_state.in_(APPROVED_STATES)).count()
+    approved = db.query(Claim).filter(Claim.project_id == project_id, Claim.review_state.in_(APPROVED_STATES)).count()
     if not approved:
         raise HTTPException(409, "Approve at least one claim before generating the handover.")
     if db.query(Conflict).filter_by(project_id=project_id, status="open").count():
@@ -33,13 +37,16 @@ def generate(project_id: str, s=Depends(current_session), db: Session = Depends(
     db.query(HandoverVersion).filter_by(project_id=project_id, status="draft").update({"status": "superseded"})
     n = (db.query(func.max(HandoverVersion.version)).filter_by(project_id=project_id).scalar() or 0) + 1
     snapshot = build_snapshot(db, m.project)
-    base = (db.query(HandoverVersion).filter_by(project_id=project_id, status="approved")
-            .order_by(HandoverVersion.version.desc()).first())
+    base = (
+        db.query(HandoverVersion)
+        .filter_by(project_id=project_id, status="approved")
+        .order_by(HandoverVersion.version.desc())
+        .first()
+    )
     diff = diff_snapshots(base.snapshot if base else None, snapshot)
     if base:
         diff["base_version"] = base.version
-    v = HandoverVersion(project_id=project_id, version=n, status="draft", snapshot=snapshot, diff=diff,
-                        created_by=m.user.id)
+    v = HandoverVersion(project_id=project_id, version=n, status="draft", snapshot=snapshot, diff=diff, created_by=m.user.id)
     db.add(v)
     db.flush()
     audit(db, project_id, m.user, "handover.generated", "handover", v.id, version=n, approved_claims=approved)
@@ -55,8 +62,12 @@ def approve(version_id: str, s=Depends(current_session), db: Session = Depends(g
     m = require_member(db, v.project_id, s, CAN_REVIEW)
     if v.status != "draft":
         raise HTTPException(409, f"Only a draft can be approved (this one is {v.status}).")
-    previous = (db.query(HandoverVersion).filter_by(project_id=v.project_id, status="approved")
-                .order_by(HandoverVersion.version.desc()).first())
+    previous = (
+        db.query(HandoverVersion)
+        .filter_by(project_id=v.project_id, status="approved")
+        .order_by(HandoverVersion.version.desc())
+        .first()
+    )
     db.query(HandoverVersion).filter_by(project_id=v.project_id, status="approved").update({"status": "superseded"})
     v.status, v.approved_by, v.approved_at = "approved", s.real_user.name, datetime.now(timezone.utc)
     carried = 0
@@ -67,8 +78,20 @@ def approve(version_id: str, s=Depends(current_session), db: Session = Depends(g
             if a.section not in changed:
                 db.add(Acknowledgement(version_id=v.id, user_id=a.user_id, section=a.section))
                 carried += 1
-    audit(db, v.project_id, m.user, "handover.approved", "handover", v.id, version=v.version,
-          changes=(v.diff or {}).get("total", 0), acknowledgements_carried_over=carried)
+    audit(
+        db,
+        v.project_id,
+        m.user,
+        "handover.approved",
+        "handover",
+        v.id,
+        version=v.version,
+        changes=(v.diff or {}).get("total", 0),
+        acknowledgements_carried_over=carried,
+    )
+    from ..notify.events import handover_approved
+
+    handover_approved(db, m.project, v.version, (v.diff or {}).get("total", 0), s.real_user.id if s.real_user else None)
     db.commit()
     return version_out(v)
 

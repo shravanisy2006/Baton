@@ -1,4 +1,5 @@
 """Remove secrets and phone numbers before text is stored or sent to the AI."""
+
 import re
 
 PATTERNS: list[tuple[str, re.Pattern]] = [

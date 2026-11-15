@@ -11,18 +11,23 @@ Everything below builds on that, in the order that most improves trust and reach
 - Living handover: update runs on new evidence only, "Changed since approval" flags, versioned diffs, acknowledgement
   carry-over.
 - Ask Baton: cited answers from permitted evidence; unanswerable questions routed to people and saved as evidence.
-- Deployed on free tiers (Vercel, Render, Supabase), 23 automated tests, full audit log.
+- Final hardening pass (done): private demo copies, per-network rate limits, session revocation, password reset and
+  email confirmation, deletion of files/projects/accounts with quote scrubbing, Resend email, persistent job queue with
+  restart resume, Alembic migrations, prompt-injection flagging, AI search keywords and topic grouping, a labelled
+  evaluation set, and CI with 51 API tests, 17 component tests and 5 browser journeys.
+- Deployed on free tiers (Vercel, Render, Supabase), full audit log.
 
 ## Next 3 months — make it dependable for real teams
 
 | Item | Why |
 | --- | --- |
-| **Email delivery** for invites and "your handover changed" notices (Resend / SMTP), with per-user preferences | Today links are copied or sent from the reviewer's own mail app |
+| **Email preferences and digests** (email delivery itself shipped: invites, new versions, questions) | Let people choose what they hear about |
 | **Scheduled checks**: re-sync GitHub nightly and notify the reviewer when approved lines change | The living handover shouldn't depend on someone pressing a button |
 | **Offline OCR** (Tesseract) as a fallback when Gemini is busy, and longer scans than 8 pages (shipped in Round 3: Gemini transcription of scans and images) | Scans should never wait on one AI service |
 | **Google Drive and Notion connectors** (read-only, OAuth), with the same access labels | Fewer manual uploads |
-| **Password reset and email verification**; optional Google sign-in | Basic account hygiene |
-| **Evaluation set**: 3 synthetic projects with hand-labelled ground truth; report claim precision/recall, quote-rejection rate and conflict accuracy per model | Measure quality instead of asserting it; compare models before switching |
+| **Google sign-in** and two-factor sign-in (password reset and email confirmation shipped) | Fewer passwords to manage |
+| **Bigger evaluation set**: grow `backend/eval` from one labelled project to 5+, run it in CI with a key on every prompt change, and track scores per model | One small project shows behaviour, not reliability |
+| **Separate worker service and Redis** for rate limits once traffic needs more than one API process | The code is already split for it (`python -m app.worker`) |
 
 ## 3–6 months — make it smarter, still verifiable
 

@@ -1,16 +1,21 @@
 """Round 3: real accounts and invites, the living handover, and Ask Baton."""
+
 from conftest import auth, signup
 from test_workflow import LEAVER, NEW, REVIEWER, _approve_all_resolvable, claims_of
 
-UPDATE_NOTE = (b"# Standup 2026-11-12\n\nDate: 2026-11-12\nAuthor: Karan Mehta\n\n"
-               b"The attendee Excel export fix is done and deployed. Chunked writes now work above 500 rows.\n\n"
-               b"Venue Wi-Fi for check-in is provided by the college IT desk.\n")
+UPDATE_NOTE = (
+    b"# Standup 2026-11-12\n\nDate: 2026-11-12\nAuthor: Karan Mehta\n\n"
+    b"The attendee Excel export fix is done and deployed. Chunked writes now work above 500 rows.\n\n"
+    b"Venue Wi-Fi for check-in is provided by the college IT desk.\n"
+)
 
 
 def _project_with_people(client, reviewer_tok):
-    body = {"name": "Library app",
-            "departing": {"name": "Riya Sharma", "handle": "riya-dev", "access_level": "Leads"},
-            "incoming": {"name": "Karan Mehta", "handle": "karan-m", "access_level": "Leads"}}
+    body = {
+        "name": "Library app",
+        "departing": {"name": "Riya Sharma", "handle": "riya-dev", "access_level": "Leads"},
+        "incoming": {"name": "Karan Mehta", "handle": "karan-m", "access_level": "Leads"},
+    }
     r = client.post("/projects", json=body, headers=auth(reviewer_tok))
     assert r.status_code == 200, r.text
     pid = r.json()["id"]
@@ -19,6 +24,7 @@ def _project_with_people(client, reviewer_tok):
 
 
 # ---------- accounts ----------
+
 
 def test_signup_signin_and_bad_input(client):
     r = client.post("/auth/signup", json={"name": "Asha", "email": "asha@example.com", "password": "short"})
@@ -35,21 +41,17 @@ def test_signup_signin_and_bad_input(client):
     # Garbage tokens are refused cleanly.
     assert client.get("/auth/me", headers=auth("not-a-token")).status_code == 401
     assert client.get("/projects", headers={"Authorization": ""}).status_code == 401
-    # Guests (no account) can't start their own project.
-    guest = client.post("/auth/guest").json()["token"]
-    assert client.post("/projects", json={"name": "X project"}, headers=auth(guest)).status_code == 401
-
-
-def test_guest_upgrades_in_place(client):
-    guest = client.post("/auth/guest").json()["token"]
-    acc = client.get("/auth/me", headers=auth(guest)).json()["account"]["id"]
-    r = client.post("/auth/signup", json={"name": "Meera", "email": "meera@example.com", "password": "long-enough-1"},
-                    headers=auth(guest))
-    me = client.get("/auth/me", headers=auth(r.json()["token"])).json()
-    assert me["account"]["id"] == acc and me["registered"]
+    # The old anonymous "guest" workspace is gone; a demo copy can't start its own project.
+    assert client.post("/auth/guest").status_code in (404, 405)
+    demo_tok = client.post("/auth/demo", json={"stage": "fresh"}).json()["token"]
+    assert client.post("/projects", json={"name": "X project"}, headers=auth(demo_tok)).status_code == 401
+    # Demo addresses can't be registered by anyone.
+    r = client.post("/auth/signup", json={"name": "X", "email": "karan@baton.demo", "password": "long-enough-1"})
+    assert r.status_code == 409
 
 
 # ---------- invites ----------
+
 
 def test_invite_accept_preview_and_remove(client):
     rev = signup(client, "Dr. Mehra")
@@ -68,10 +70,12 @@ def test_invite_accept_preview_and_remove(client):
     assert gaps_ok
 
     # Only reviewers/admins make invite links; a departing member can't.
-    assert client.post(f"/projects/{pid}/invites", json={"user_id": karan_slot["user_id"]},
-                       headers=auth(as_riya)).status_code == 403
-    inv = client.post(f"/projects/{pid}/invites", json={"user_id": karan_slot["user_id"], "email": "karan@example.com"},
-                      headers=auth(rev)).json()
+    assert (
+        client.post(f"/projects/{pid}/invites", json={"user_id": karan_slot["user_id"]}, headers=auth(as_riya)).status_code == 403
+    )
+    inv = client.post(
+        f"/projects/{pid}/invites", json={"user_id": karan_slot["user_id"], "email": "karan@example.com"}, headers=auth(rev)
+    ).json()
     token = inv["token"]
     assert inv["state"] == "pending" and inv["path"] == f"/invite/{token}"
     info = client.get(f"/invites/{token}").json()  # public preview, no sign-in
@@ -122,12 +126,14 @@ def test_demo_still_switches_people(client, demo):
     """The worked example keeps one-click switching between its people (no accounts needed)."""
     people = client.get("/auth/me", headers=auth(demo["tokens"][REVIEWER])).json()["people"]
     assert len(people) == 4
-    r = client.post(f"/projects/{demo['project_id']}/invites", json={"user_id": demo["people"][NEW]},
-                    headers=auth(demo["tokens"][REVIEWER]))
+    r = client.post(
+        f"/projects/{demo['project_id']}/invites", json={"user_id": demo["people"][NEW]}, headers=auth(demo["tokens"][REVIEWER])
+    )
     assert r.status_code == 409
 
 
 # ---------- living handover ----------
+
 
 def _approve_v1(client, demo):
     pid, tok = demo["project_id"], auth(demo["tokens"][REVIEWER])
@@ -141,7 +147,7 @@ def _approve_v1(client, demo):
 
 def test_living_handover_update_flags_changes_and_versions(client, demo):
     pid, tok = demo["project_id"], auth(demo["tokens"][REVIEWER])
-    v1 = _approve_v1(client, demo)
+    _approve_v1(client, demo)
     before = claims_of(client, demo)["claims"]
     approved_before = {c["id"] for c in before if c["review_state"] in ("approved", "corrected")}
     assert approved_before
@@ -151,8 +157,12 @@ def test_living_handover_update_flags_changes_and_versions(client, demo):
     assert r.status_code == 409 and "No new evidence" in r.json()["detail"]
 
     # New evidence arrives after approval.
-    r = client.post(f"/projects/{pid}/sources/upload", files=[("files", ("standup-2026-11-12.md", UPDATE_NOTE))],
-                    data={"access_label": "Team"}, headers=tok)
+    r = client.post(
+        f"/projects/{pid}/sources/upload",
+        files=[("files", ("standup-2026-11-12.md", UPDATE_NOTE))],
+        data={"access_label": "Team"},
+        headers=tok,
+    )
     assert r.json()["results"][0]["ok"]
     assert client.get(f"/projects/{pid}", headers=tok).json()["counts"]["new_evidence"] == 2
     job = client.post(f"/projects/{pid}/analyse", json={}, headers=tok).json()  # defaults to update
@@ -174,16 +184,23 @@ def test_living_handover_update_flags_changes_and_versions(client, demo):
     assert any("500 rows" in i["text"] for i in flagged)
     # The newer quote is shown beside the old one, word-for-word and highlighted.
     newer = next(i for i in flagged if i.get("newer_evidence"))["newer_evidence"][0]
-    assert "done and deployed" in newer["quote"] and newer["text"][newer["start"]:newer["end"]].lower() == newer["quote"].lower()
+    assert (
+        "done and deployed" in newer["quote"] and newer["text"][newer["start"] : newer["end"]].lower() == newer["quote"].lower()
+    )
 
     # Reviewer settles the new conflict in favour of the newer evidence, approves the new claim, issues v2.
-    new_conflicts = [k for k in client.get(f"/projects/{pid}/conflicts", headers=tok).json()["conflicts"]
-                     if k["status"] == "open"]
+    new_conflicts = [
+        k for k in client.get(f"/projects/{pid}/conflicts", headers=tok).json()["conflicts"] if k["status"] == "open"
+    ]
     assert new_conflicts
     for k in new_conflicts:
         newest = next(c for c in k["side_a"] + k["side_b"] if "deployed" in c["statement"])
-        assert client.post(f"/conflicts/{k['id']}/resolve", json={"winner_claim_id": newest["id"], "note": "Fixed."},
-                           headers=tok).status_code == 200
+        assert (
+            client.post(
+                f"/conflicts/{k['id']}/resolve", json={"winner_claim_id": newest["id"], "note": "Fixed."}, headers=tok
+            ).status_code
+            == 200
+        )
     for c in claims_of(client, demo)["claims"]:
         if c["review_state"] == "pending" and c["confidence"] != "unverified":
             client.post(f"/claims/{c['id']}/review", json={"action": "approve"}, headers=tok)
@@ -199,8 +216,7 @@ def test_living_handover_update_flags_changes_and_versions(client, demo):
     h2 = client.get(f"/projects/{pid}/handover", headers=auth(demo["tokens"][NEW])).json()
     assert h2["version"] == 2 and h2["diff"]["total"] >= 1
     changed_sections = set(h2["diff"]["sections"])
-    assert changed_sections and set(h2["acknowledged"]) == {
-        s["key"] for s in h2["content"]["sections"]} - changed_sections
+    assert changed_sections and set(h2["acknowledged"]) == {s["key"] for s in h2["content"]["sections"]} - changed_sections
     assert not any(i.get("changed_since_approval") for s in h2["content"]["sections"] for i in s["items"])
     acts = {a["action"] for a in client.get(f"/projects/{pid}/audit", headers=tok).json()}
     assert {"analysis.updated", "handover.approved"} <= acts
@@ -215,20 +231,36 @@ def test_github_resync_adds_only_new_items(client, monkeypatch):
     def fake_fetch(url, token=None):
         calls["n"] += 1
         out = ParsedSource()
-        out.units = [Unit(kind="github_issue", text="Issue #1 [open]: Add login page", author="riya-dev",
-                          occurred_at="2026-11-01", location={"number": 1})]
+        out.units = [
+            Unit(
+                kind="github_issue",
+                text="Issue #1 [open]: Add login page",
+                author="riya-dev",
+                occurred_at="2026-11-01",
+                location={"number": 1},
+            )
+        ]
         if calls["n"] > 1:
-            out.units.append(Unit(kind="github_issue", text="Issue #2 [open]: Parking map is wrong",
-                                  author="karan-m", occurred_at="2026-11-13", location={"number": 2}))
+            out.units.append(
+                Unit(
+                    kind="github_issue",
+                    text="Issue #2 [open]: Parking map is wrong",
+                    author="karan-m",
+                    occurred_at="2026-11-13",
+                    location={"number": 2},
+                )
+            )
         return "club/eventapp", out
 
     monkeypatch.setattr(github, "fetch_repo", fake_fetch)
     import app.sources.router as sr
+
     monkeypatch.setattr(sr, "fetch_repo", fake_fetch)
     rev = signup(client)
     pid, _ = _project_with_people(client, rev)
-    src = client.post(f"/projects/{pid}/sources/github", json={"repo_url": "https://github.com/club/eventapp"},
-                      headers=auth(rev)).json()
+    src = client.post(
+        f"/projects/{pid}/sources/github", json={"repo_url": "https://github.com/club/eventapp"}, headers=auth(rev)
+    ).json()
     assert src["unit_count"] == 1
     client.post(f"/projects/{pid}/analyse", json={}, headers=auth(rev))
     r = client.post(f"/projects/{pid}/check-for-changes", json={}, headers=auth(rev)).json()
@@ -239,6 +271,7 @@ def test_github_resync_adds_only_new_items(client, monkeypatch):
 
 # ---------- Ask Baton ----------
 
+
 def test_ask_baton_cites_checked_quotes_and_respects_access(client, demo):
     pid = demo["project_id"]
     _approve_all_resolvable(client, demo)
@@ -247,18 +280,20 @@ def test_ask_baton_cites_checked_quotes_and_respects_access(client, demo):
     q = r.json()
     assert r.status_code == 200 and q["status"] == "answered" and q["citations"]
     c = q["citations"][0]
-    assert c["match"] == "exact" and c["text"][c["start"]:c["end"]].lower() == c["quote"].lower()
+    assert c["match"] == "exact" and c["text"][c["start"] : c["end"]].lower() == c["quote"].lower()
 
     # An invented quote is rejected, so Baton says it can't answer instead of showing it.
     q = client.post(f"/projects/{pid}/ask", json={"question": "Can you invent the deploy runbook steps?"}, headers=karan).json()
     assert q["status"] == "unanswered" and q["rejected_quotes"] == 1 and not q["citations"]
 
     # Restricted evidence never reaches Karan (Leads), even through Ask Baton.
-    q = client.post(f"/projects/{pid}/ask", json={"question": "Who is the sponsor contact for the MoU?"},
-                    headers=karan).json()
+    q = client.post(f"/projects/{pid}/ask", json={"question": "Who is the sponsor contact for the MoU?"}, headers=karan).json()
     assert q["status"] == "unanswered" and "Arjun" not in (q["answer"] or "")
-    q = client.post(f"/projects/{pid}/ask", json={"question": "Who is the sponsor contact for the MoU?"},
-                    headers=auth(demo["tokens"][REVIEWER])).json()
+    q = client.post(
+        f"/projects/{pid}/ask",
+        json={"question": "Who is the sponsor contact for the MoU?"},
+        headers=auth(demo["tokens"][REVIEWER]),
+    ).json()
     assert q["status"] == "answered" and "Arjun Rao" in q["citations"][0]["quote"]
 
     # Bad input.
@@ -269,8 +304,7 @@ def test_ask_baton_cites_checked_quotes_and_respects_access(client, demo):
 def test_ask_unanswered_goes_to_leaver_and_comes_back_as_evidence(client, demo):
     pid = demo["project_id"]
     karan, riya = auth(demo["tokens"][NEW]), auth(demo["tokens"][LEAVER])
-    q = client.post(f"/projects/{pid}/ask", json={"question": "Where is visitor parking for the fest?"},
-                    headers=karan).json()
+    q = client.post(f"/projects/{pid}/ask", json={"question": "Where is visitor parking for the fest?"}, headers=karan).json()
     assert q["status"] == "unanswered"
     sent = client.post(f"/questions/{q['id']}/send", headers=karan).json()
     assert sent["sent"] and sent["status"] == "sent"
@@ -291,6 +325,7 @@ def test_ask_unanswered_goes_to_leaver_and_comes_back_as_evidence(client, demo):
 
 
 # ---------- reliability: the same action twice, bad input ----------
+
 
 def test_repeated_actions_are_safe(client, demo):
     pid, tok = demo["project_id"], auth(demo["tokens"][REVIEWER])
@@ -317,41 +352,65 @@ def test_repeated_actions_are_safe(client, demo):
     assert client.get("/projects/does-not-exist", headers=tok).status_code == 404
 
 
-# ---------- ready-made demo accounts for judges ----------
+# ---------- demo sign-ins: every judge gets a private copy ----------
 
-def test_judge_demo_accounts_and_reset(client):
-    from app import judge
 
-    judge.reset(background=False)
-    info = client.get("/judge-demo").json()
-    assert info["status"] == "ready" and len(info["accounts"]) == 3 and info["password"]
-    tokens = {a["role"]: client.post("/auth/signin", json={"email": a["email"], "password": info["password"]}).json()["token"]
-              for a in info["accounts"]}
-    rev, karan, riya = auth(tokens["reviewer"]), auth(tokens["incoming"]), auth(tokens["departing"])
-    pid = next(p["id"] for p in client.get("/projects", headers=karan).json())
-    ov = client.get(f"/projects/{pid}", headers=rev).json()
-    assert ov["project"]["is_judge_demo"] and ov["handover"]["approved_version"] == 1
-    assert {m["name"]: m["status"] for m in ov["members"]} == {
-        "Priya Nair": "joined", "Riya Sharma": "joined", "Karan Mehta": "joined"}
-    h = client.get(f"/projects/{pid}/handover", headers=karan).json()
-    assert h["status"] == "approved" and any(s["items"] for s in h["content"]["sections"])
-    assert client.get(f"/projects/{pid}/gaps", headers=riya).status_code == 200
-
-    # A judge changes things; reset puts the shared project back.
-    client.post(f"/projects/{pid}/members/{ov['me']['user_id']}/remove", headers=rev)
-    r = client.post(f"/projects/{pid}/sources/upload", headers=rev, data={"access_label": "Team"},
-                    files=[("files", ("standup.md", UPDATE_NOTE))])
+def test_demo_signins_open_private_copies(client):
+    info = client.get("/auth/demo/info").json()
+    assert len(info["accounts"]) == 3 and info["password"] and info["private"] is True
+    pw = info["password"]
+    # Judge A signs in as the reviewer: a private copy, already analysed, reviewed and handed over (v1).
+    a = client.post("/auth/signin", json={"email": "reviewer@baton.demo", "password": pw}).json()
+    assert a["sandbox"] == "new"
+    pid_a = a["project_id"]
+    ov = client.get(f"/projects/{pid_a}", headers=auth(a["token"])).json()
+    assert ov["handover"]["approved_version"] == 1 and ov["counts"]["new_evidence"] == 0
+    # In the same browser, signing in as Karan switches person inside the SAME copy.
+    k = client.post("/auth/signin", json={"email": "karan@baton.demo", "password": pw}, headers=auth(a["token"])).json()
+    assert k["sandbox"] == "existing"
+    h = client.get(f"/projects/{pid_a}/handover", headers=auth(k["token"])).json()
+    assert h["status"] == "approved" and any(sec["items"] for sec in h["content"]["sections"])
+    # Judge B (another browser) gets a different copy and can't see or touch judge A's.
+    b = client.post("/auth/signin", json={"email": "reviewer@baton.demo", "password": pw}).json()
+    assert b["project_id"] != pid_a
+    assert client.get(f"/projects/{pid_a}", headers=auth(b["token"])).status_code == 404
+    r = client.post(
+        f"/projects/{b['project_id']}/sources/upload",
+        headers=auth(b["token"]),
+        data={"access_label": "Team"},
+        files=[("files", ("standup.md", UPDATE_NOTE))],
+    )
     assert r.status_code == 200
-    stranger = signup(client)
-    assert client.post("/judge-demo/reset", headers=auth(stranger)).status_code == 403
-    judge.reset(background=False)
-    pid2 = next(p["id"] for p in client.get("/projects", headers=karan).json())
-    assert pid2 != pid and client.get(f"/projects/{pid}", headers=rev).status_code == 404
-    ov2 = client.get(f"/projects/{pid2}", headers=rev).json()
-    assert ov2["counts"]["new_evidence"] == 0 and ov2["handover"]["approved_version"] == 1
+    assert client.get(f"/projects/{pid_a}", headers=auth(a["token"])).json()["counts"]["new_evidence"] == 0
+    # Restart gives a fresh copy and deletes the old one.
+    r = client.post("/auth/demo/restart", headers=auth(b["token"])).json()
+    assert r["project_id"] != b["project_id"]
+    assert client.get(f"/projects/{r['project_id']}", headers=auth(r["token"])).status_code == 200
+    assert client.get(f"/projects/{b['project_id']}", headers=auth(r["token"])).status_code == 404
+    # Wrong demo password is refused; demo copies can't be restarted by real accounts.
+    assert client.post("/auth/signin", json={"email": "karan@baton.demo", "password": "nope"}).status_code == 401
+    assert client.post("/auth/demo/restart", headers=auth(signup(client))).status_code == 409
+
+
+def test_old_demo_copies_are_cleaned_up(client):
+    from datetime import datetime, timedelta, timezone
+
+    from app.db import SessionLocal
+    from app.models import Account, Project
+    from app.sandbox import cleanup_old_sandboxes
+
+    d = client.post("/auth/demo", json={"stage": "fresh"}).json()
+    with SessionLocal() as db:
+        acc_id = db.get(Project, d["project_id"]).account_id
+        db.get(Account, acc_id).created_at = datetime.now(timezone.utc) - timedelta(hours=30)
+        db.commit()
+    assert cleanup_old_sandboxes() >= 1
+    with SessionLocal() as db:
+        assert db.get(Project, d["project_id"]) is None and db.get(Account, acc_id) is None
 
 
 # ---------- scanned PDFs and images (OCR) ----------
+
 
 def _png() -> bytes:
     import pymupdf
@@ -374,8 +433,12 @@ def _scanned_pdf() -> bytes:
 def test_scans_and_images_are_transcribed(client):
     rev = signup(client)
     pid, _ = _project_with_people(client, rev)
-    r = client.post(f"/projects/{pid}/sources/upload", headers=auth(rev), data={"access_label": "Team"},
-                    files=[("files", ("whiteboard.png", _png())), ("files", ("scanned-minutes.pdf", _scanned_pdf()))])
+    r = client.post(
+        f"/projects/{pid}/sources/upload",
+        headers=auth(rev),
+        data={"access_label": "Team"},
+        files=[("files", ("whiteboard.png", _png())), ("files", ("scanned-minutes.pdf", _scanned_pdf()))],
+    )
     res = {x["filename"]: x for x in r.json()["results"]}
     assert res["whiteboard.png"]["ok"] and res["scanned-minutes.pdf"]["ok"], r.text
     assert res["scanned-minutes.pdf"]["source"]["coverage"]["ocr_pages"] == 2
@@ -391,8 +454,12 @@ def test_scan_when_ai_is_down_is_reported_not_crashed(client):
     rev = signup(client)
     pid, _ = _project_with_people(client, rev)
     set_providers_for_tests([])
-    r = client.post(f"/projects/{pid}/sources/upload", headers=auth(rev), data={"access_label": "Team"},
-                    files=[("files", ("photo.jpg", _png()))]).json()["results"][0]
+    r = client.post(
+        f"/projects/{pid}/sources/upload",
+        headers=auth(rev),
+        data={"access_label": "Team"},
+        files=[("files", ("photo.jpg", _png()))],
+    ).json()["results"][0]
     assert not r["ok"] and r["source"]["status"] == "unreadable" and "transcribed" in r["source"]["error"]
 
 
@@ -410,41 +477,51 @@ def test_handover_pdf_is_a_real_file_and_respects_access(client, demo):
     text = "".join(p.get_text() for p in pymupdf.open(stream=r.content, filetype="pdf"))
     assert "What you own" in text and "Version 1" in text
     assert "Arjun Rao" not in text  # Restricted contact never reaches a Leads reader, even in the PDF
-    full = "".join(p.get_text() for p in pymupdf.open(stream=client.get(f"/projects/{pid}/handover/pdf", headers=tok).content,
-                                                     filetype="pdf"))
+    full = "".join(
+        p.get_text()
+        for p in pymupdf.open(stream=client.get(f"/projects/{pid}/handover/pdf", headers=tok).content, filetype="pdf")
+    )
     assert "Arjun Rao" in full
     assert client.get(f"/projects/{pid}/handover/pdf").status_code == 401
 
 
 def test_busy_ai_is_retried_and_leftovers_finish_later(client, demo, monkeypatch):
     """A batch that hits a busy AI is retried; if it still fails, its evidence waits for the next update run."""
-    import app.pipeline as pl
+    import app.extract.service as ex
     from app.llm.provider import AIUnavailable
 
     pid, tok = demo["project_id"], auth(demo["tokens"][REVIEWER])
-    real = pl.extract_batch
+    real = ex.ask_extract
     calls = {"n": 0}
 
-    def flaky(db, project_id, batch, filenames):
+    def flaky(db, batch, filenames):
         calls["n"] += 1
         if calls["n"] == 1:
             raise AIUnavailable("503 UNAVAILABLE: high demand")  # first try busy, retry works
-        return real(db, project_id, batch, filenames)
+        return real(db, batch, filenames)
 
-    monkeypatch.setattr(pl, "extract_batch", flaky)
-    r = client.post(f"/projects/{pid}/sources/upload", headers=tok, data={"access_label": "Team"},
-                    files=[("files", ("standup.md", UPDATE_NOTE))])
+    monkeypatch.setattr(ex, "ask_extract", flaky)
+    r = client.post(
+        f"/projects/{pid}/sources/upload",
+        headers=tok,
+        data={"access_label": "Team"},
+        files=[("files", ("standup.md", UPDATE_NOTE))],
+    )
     assert r.status_code == 200
     client.post(f"/projects/{pid}/analyse", json={}, headers=tok)
     job = client.get(f"/projects/{pid}", headers=tok).json()["latest_job"]
     assert job["status"] == "done" and job["stats"]["claims"] == 2 and calls["n"] == 2
 
-    def down(db, project_id, batch, filenames):
+    def down(db, batch, filenames):
         raise AIUnavailable("429 RESOURCE_EXHAUSTED")
 
-    monkeypatch.setattr(pl, "extract_batch", down)
-    client.post(f"/projects/{pid}/sources/upload", headers=tok, data={"access_label": "Team"},
-                files=[("files", ("standup-2.md", UPDATE_NOTE.replace(b"Standup", b"Second standup")))])
+    monkeypatch.setattr(ex, "ask_extract", down)
+    client.post(
+        f"/projects/{pid}/sources/upload",
+        headers=tok,
+        data={"access_label": "Team"},
+        files=[("files", ("standup-2.md", UPDATE_NOTE.replace(b"Standup", b"Second standup")))],
+    )
     client.post(f"/projects/{pid}/analyse", json={}, headers=tok)
     ov = client.get(f"/projects/{pid}", headers=tok).json()
     assert ov["latest_job"]["status"] == "failed" and "Nothing was lost" in ov["latest_job"]["error"]
@@ -452,7 +529,7 @@ def test_busy_ai_is_retried_and_leftovers_finish_later(client, demo, monkeypatch
 
 
 def test_second_opinion_for_an_over_strict_support_check(client, demo):
-    pid, tok = demo["project_id"], auth(demo["tokens"][REVIEWER])
+    tok = auth(demo["tokens"][REVIEWER])
     claims = claims_of(client, demo)["claims"]
     strict = next(c for c in claims if c["statement"] == "The registration API has no automated tests.")
     # This one's quote is real but doesn't support the claim: the first check said "unrelated".

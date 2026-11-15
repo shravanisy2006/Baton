@@ -40,7 +40,7 @@ export default function EvidencePage() {
     <div>
       <PageHeader
         title="Evidence"
-        subtitle="Every source is split into small numbered pieces. Claims must quote these exact words, and the quote check verifies them."
+        subtitle="Every source is split into small numbered pieces. Every finding must quote these exact words, and code checks that it does."
       />
       <form
         className="mb-4 flex flex-col gap-2 sm:flex-row"
@@ -51,9 +51,19 @@ export default function EvidencePage() {
       >
         <div className="relative flex-1">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-          <input className={input + " pl-9"} placeholder="Search text or an ID like E-4" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input
+            className={input + " pl-9"}
+            placeholder="Search text or an ID like E-4"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
         </div>
-        <select className={select} value={source} onChange={(e) => (setSource(e.target.value), setApplied({ q, source: e.target.value }))} aria-label="Source">
+        <select
+          className={select}
+          value={source}
+          onChange={(e) => (setSource(e.target.value), setApplied({ q, source: e.target.value }))}
+          aria-label="Source"
+        >
           <option value="">All sources</option>
           {sources.data?.sources.map((s) => (
             <option key={s.id} value={s.id}>

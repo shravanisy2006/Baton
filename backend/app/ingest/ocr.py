@@ -4,6 +4,7 @@ The transcription becomes the evidence text. Every later quote is checked word f
 each unit is labelled as an AI transcription of a scan (with its page), so a reviewer knows to compare it
 with the original if a line matters.
 """
+
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -30,15 +31,17 @@ def transcribe(db: Session, parsed: ParsedSource, filename: str) -> None:
     if not parsed.needs_ocr:
         return
     pages = [n for n, _, _ in parsed.needs_ocr]
-    prompt = (f"File: {filename}. The images are pages {', '.join(map(str, pages))} in that order. "
-              "Return one entry per page with its number and exact text.")
+    prompt = (
+        f"File: {filename}. The images are pages {', '.join(map(str, pages))} in that order. "
+        "Return one entry per page with its number and exact text."
+    )
     try:
-        result, model = call_json(db, "ocr", SYSTEM, prompt, Transcription,
-                                  images=[(b, mime) for _, b, mime in parsed.needs_ocr])
+        result, model = call_json(db, "ocr", SYSTEM, prompt, Transcription, images=[(b, mime) for _, b, mime in parsed.needs_ocr])
     except (AIUnavailable, InvalidAIOutput) as e:
         for n in pages:
-            parsed.skipped.append(f"page {n}: scanned image could not be transcribed right now ({str(e)[:80]}). "
-                                  "Upload it again in a minute.")
+            parsed.skipped.append(
+                f"page {n}: scanned image could not be transcribed right now ({str(e)[:80]}). Upload it again in a minute."
+            )
         parsed.unreadable = not parsed.units
         parsed.needs_ocr = []
         return

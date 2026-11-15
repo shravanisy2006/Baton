@@ -1,0 +1,69 @@
+{
+  "run_at": "2026-11-15T13:23:07",
+  "mode": "offline",
+  "ai_chain": [],
+  "metrics": {
+    "retrieval_top3_literal_keyword_only": "4/4 (100%)",
+    "retrieval_top12_literal_keyword_only": "4/4 (100%)",
+    "retrieval_top3_rephrased_keyword_only": "3/5 (60%)",
+    "retrieval_top12_rephrased_keyword_only": "4/5 (80%)"
+  },
+  "details": {
+    "retrieval": [
+      {
+        "id": "Q1",
+        "type": "literal",
+        "lexical_hit": true,
+        "lexical_hit3": true
+      },
+      {
+        "id": "Q2",
+        "type": "rephrased",
+        "lexical_hit": true,
+        "lexical_hit3": true
+      },
+      {
+        "id": "Q3",
+        "type": "literal",
+        "lexical_hit": true,
+        "lexical_hit3": true
+      },
+      {
+        "id": "Q4",
+        "type": "rephrased",
+        "lexical_hit": true,
+        "lexical_hit3": false
+      },
+      {
+        "id": "Q5",
+        "type": "rephrased",
+        "lexical_hit": false,
+        "lexical_hit3": false
+      },
+      {
+        "id": "Q6",
+        "type": "literal",
+        "lexical_hit": true,
+        "lexical_hit3": true
+      },
+      {
+        "id": "Q7",
+        "type": "rephrased",
+        "lexical_hit": true,
+        "lexical_hit3": true
+      },
+      {
+        "id": "Q8",
+        "type": "rephrased",
+        "lexical_hit": true,
+        "lexical_hit3": true
+      },
+      {
+        "id": "Q9",
+        "type": "literal",
+        "lexical_hit": true,
+        "lexical_hit3": true
+      }
+    ]
+  }
+}

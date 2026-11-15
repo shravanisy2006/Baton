@@ -3,18 +3,25 @@
 Base URL: your Render URL (e.g. `https://baton-api.onrender.com`) or `http://localhost:8000` locally.
 Interactive docs with request/response schemas: **`/docs`** (Swagger UI) and `/redoc` on the running API.
 
-All endpoints except `/health`, `/samples.zip`, `/auth/signup`, `/auth/signin`, `/auth/guest`, `/auth/demo` and
-`GET /invites/{token}` need `Authorization: Bearer <token>`. Project access is decided by membership only: someone who
+All endpoints except `/health`, `/samples.zip`, `/auth/signup`, `/auth/signin`, `/auth/demo`, `/auth/demo/info`,
+`/auth/verify`, `/auth/password-reset*` and `GET /invites/{token}` need `Authorization: Bearer <token>`. Public and
+expensive endpoints are rate-limited per network address (HTTP 429 with `Retry-After`). Project access is decided by membership only: someone who
 isn't in a project gets the same 404 whether or not it exists.
 Every project endpoint checks membership, role and access level on the server. Content above your access level
 is filtered out in the database query, never just hidden in the UI.
 
 | Method | Path | What it does |
 | --- | --- | --- |
-| POST | `/auth/signup` | Create an account (name, email, password ≥ 8 chars; scrypt hash). A guest session sending its token is upgraded in place. |
-| POST | `/auth/signin` | Sign in with email and password (8 failed attempts per 15 minutes are blocked). |
-| POST | `/auth/guest` | A session without an account (kept for older links; can't create projects). |
-| POST | `/auth/demo` | Create a private copy of the synthetic EventApp worked example, start its analysis, sign in as its reviewer. |
+| POST | `/auth/signup` | Create an account (name, email, password ≥ 8 chars; scrypt hash; email unique in the database). Sends a confirmation email when email is configured. 10 per hour per network. |
+| POST | `/auth/signin` | Sign in. 8 wrong passwords for one email from one network block that pair for 15 minutes (others are unaffected). The published demo addresses open a private demo copy (or switch person inside this browser's copy). |
+| POST | `/auth/demo` | `{"role": "reviewer"\|"departing"\|"incoming", "stage": "handed_over"\|"fresh"}`: a private copy of the EventApp demo, signed in as that person. 12 per hour per network. |
+| GET | `/auth/demo/info` | Public: the demo sign-ins shown on the website. |
+| POST | `/auth/demo/restart` | Demo copy: replace it with a fresh one. |
+| POST | `/auth/signout-everywhere` | End every session of your account (all devices). |
+| POST | `/auth/password` | Change password (current + new); other devices are signed out; returns a new token. |
+| POST | `/auth/verify/send` · `/auth/verify` | Send / use an email-confirmation link (single use, 48 h). |
+| POST | `/auth/password-reset/request` · `/auth/password-reset` | Email a reset link (2 h, single use; same reply whether or not the address exists) / set the new password. 503 if email isn't configured. |
+| POST | `/auth/delete-account` | Password required. Deletes projects you created; removes your access elsewhere (their audit entries stay as "Deleted user"). |
 | GET | `/auth/me` | You, whether you're previewing someone, people you may switch to, and your projects. |
 | POST | `/auth/act-as` | Worked example: switch person. Own projects: preview as someone who hasn't joined yet, or switch back to yourself. |
 | GET | `/projects` | Projects you're a member of. |
@@ -22,12 +29,13 @@ is filtered out in the database query, never just hidden in the UI.
 | GET | `/projects/{project_id}` | Overview: workflow progress, counts (filtered by your access), latest analysis job, members, AI status. |
 | POST | `/projects/{project_id}/members` | Admin: add a person with a role (admin/reviewer/departing/incoming/viewer) and access level. |
 | GET | `/projects/{project_id}/members` | Members with status: joined, invite sent, or not invited. |
-| POST | `/projects/{project_id}/invites` | Reviewer/admin: one-time join link for a named person (14 days; replaces any earlier link; stored only as a hash). |
+| POST | `/projects/{project_id}/invites` | Reviewer/admin: one-time join link for a named person (14 days; replaces any earlier link; stored only as a hash). With `email`, only that address can accept (and must be confirmed when email is configured), and the link is emailed; `email_status` says `sent`, `failed` or `not_configured`. |
 | POST | `/invites/{invite_id}/revoke` | Reviewer/admin: cancel a pending invite. |
 | GET | `/invites/{token}` | Public: what the link is for (project, person, role, access) and whether it is still valid. |
 | POST | `/invites/{token}/accept` | Signed-in account: take over the invited person's place in the project. |
+| POST | `/projects/{project_id}/delete` | Admin: delete the project and everything in it; `confirm_name` must equal the project name. |
 | POST | `/projects/{project_id}/members/{user_id}/remove` | Admin: remove someone's access immediately (history stays in the audit log). |
-| POST | `/projects/{project_id}/analyse` | Admin/reviewer: `{"mode": "full"}` reads everything (start over); `{"mode": "update"}` reads only new evidence and keeps every review decision. Default: update once a project has been analysed. |
+| POST | `/projects/{project_id}/analyse` | Admin/reviewer: queues an analysis job and returns it (`status: queued`); poll `/jobs/latest`. `{"mode": "full"}` reads everything (start over); `{"mode": "update"}` reads only new evidence and keeps every review decision. Default: update once a project has been analysed. |
 | POST | `/projects/{project_id}/check-for-changes` | Admin/reviewer: re-sync every GitHub source (new or changed items only), then start an update run if anything is new. |
 | POST | `/projects/{project_id}/ask` | Any member: Ask Baton. Retrieval over evidence at or below your level, AI answer with citations, every quote checked word for word. |
 | GET | `/projects/{project_id}/questions` | Your questions (incoming/viewer) or all questions at your level (reviewer, leaver). |
@@ -35,7 +43,8 @@ is filtered out in the database query, never just hidden in the UI.
 | GET | `/samples.zip` | The synthetic sample project files, to try uploading. |
 | GET | `/projects/{project_id}/jobs/latest` | Status, stage, stats and warnings of the latest analysis. |
 | GET | `/projects/{project_id}/sources` | Sources at or below your access level, plus a count of hidden ones. |
-| POST | `/projects/{project_id}/sources/upload` | Multipart upload of PDF/DOCX/TXT/MD/CSV/JSON files, chat exports and images (PNG/JPG/WEBP) with an access_label. Parses into evidence units immediately; scanned PDF pages and images are transcribed by Gemini (`coverage.ocr_pages`). |
+| POST | `/projects/{project_id}/sources/upload` | Multipart upload (at most 10 files, 10 MB each, 200 sources per project) of PDF/DOCX/TXT/MD/CSV/JSON files, chat exports and images (PNG/JPG/WEBP) with an access_label. Parses into redacted evidence immediately (the original file is not stored); scans are transcribed by Gemini (`coverage.ocr_pages`); AI-directed text is flagged (`coverage.flagged_instructions`). |
+| POST | `/sources/{source_id}/delete` | Admin/reviewer: delete a source and its evidence everywhere (findings relying only on it, quotes in handover versions and answers). Returns what was removed. |
 | POST | `/projects/{project_id}/sources/github` | Import issues, PRs, comments and commits from a GitHub repo via the REST API. Token (optional) is never stored. |
 | GET | `/projects/{project_id}/evidence` | Evidence units (filter: source_id, q). Access label filter is applied in SQL. |
 | GET | `/evidence/{evidence_id}` | One evidence unit, if your access level allows it. |
@@ -55,7 +64,7 @@ is filtered out in the database query, never just hidden in the UI.
 | GET | `/projects/{project_id}/handover/pdf` | The handover as a generated PDF file (`Handover-<project>-v<n>.pdf`), filtered by the reader's access level like the page. |
 | POST | `/handover/{version_id}/ack` | Incoming member: acknowledge a section. |
 | GET | `/projects/{project_id}/audit` | Reviewer/admin: append-only audit log. |
-| GET | `/health` | Liveness check and AI configuration status. |
+| GET | `/health` | Database reachable (503 if not), AI and email configured, job queue (workers, queued, running). |
 
 ## Confidence labels
 

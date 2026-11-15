@@ -10,8 +10,10 @@ os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///
 os.environ["LOCAL_STORAGE_DIR"] = f"{_tmp}/storage"
 os.environ["GEMINI_API_KEY"] = ""
 os.environ["BATON_SKIP_DEMO_CACHE"] = "1"
-os.environ["BATON_SKIP_JUDGE_DEMO"] = "1"
-os.environ["BATON_BUSY_WAIT_SECONDS"] = "0"  # built explicitly in its own test  # tests use the scripted AI, not the saved real answers
+os.environ["BATON_BUSY_WAIT_SECONDS"] = "0"
+os.environ["BATON_JOBS_INLINE"] = "1"  # jobs run inside the request (same code the worker runs), so results are ready
+os.environ["BATON_RUN_WORKER"] = "0"  # worker threads are started explicitly in the tests that check them
+os.environ["APP_URL"] = "https://baton.test"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytest  # noqa: E402
@@ -43,72 +45,180 @@ def fake_extract(prompt: str) -> dict:
             claims.append(claim)
 
     pr = _find(u, "Dropping Razorpay")
-    add("keep online payments disabled with the PAYMENTS_ENABLED flag", type="decision", subject="payments",
+    add(
+        "keep online payments disabled with the PAYMENTS_ENABLED flag",
+        type="decision",
+        subject="payments",
         statement="Online payments stay disabled with PAYMENTS_ENABLED until the sponsor MoU is signed.",
         rationale="The sponsor asked to pause payments until the MoU is signed.",
-        extra=[{"evidence_id": pr, "quote": "The sponsor asked us to pause payments until the MoU is signed."}] if pr else [])
-    add("Task: Export attendees to Excel | Assignee: riya-dev | Status: Done", type="task", subject="excel export",
-        statement="The attendee Excel export is done.", status="done", owner="riya-dev")
-    add("above 500 rows it times out and the downloaded file is corrupted", type="task", subject="excel export",
-        statement="The attendee Excel export is broken above 500 rows and was reopened.", status="reopened")
-    add("follow up with the sponsor about when the MoU will be signed", type="task", subject="sponsor mou follow-up",
-        statement="Someone must follow up with the sponsor about the MoU signing date.", status="todo")
-    add("do we support offline check-in at the venue", type="open_question", subject="offline check-in",
-        statement="It is undecided whether offline check-in at the venue is supported.")
-    add("Do not change the registrations table schema before the fest", type="risk", subject="registrations schema",
-        statement="Do not change the registrations table schema before the fest; the check-in app reads it.")
-    add("Riya owns the registration API and the deploy scripts", type="owner", subject="deploy scripts",
-        statement="Riya owns the registration API and the deploy scripts.", owner="Riya")
-    add("the CI build fails every Monday because the test API token expires weekly", type="recurring_problem",
-        subject="ci token", statement="CI fails every Monday because the test API token expires weekly.")
-    add("depends on the /v2/attendees endpoint", type="dependency", subject="v2 attendees endpoint",
-        statement="The mobile check-in app depends on the /v2/attendees endpoint.")
-    add("Our sponsor contact for the MoU is Arjun Rao", type="contact", subject="sponsor contact",
-        statement="Arjun Rao is the sponsor contact for the MoU.")
+        extra=[{"evidence_id": pr, "quote": "The sponsor asked us to pause payments until the MoU is signed."}] if pr else [],
+    )
+    add(
+        "Task: Export attendees to Excel | Assignee: riya-dev | Status: Done",
+        type="task",
+        subject="excel export",
+        statement="The attendee Excel export is done.",
+        status="done",
+        owner="riya-dev",
+    )
+    add(
+        "above 500 rows it times out and the downloaded file is corrupted",
+        type="task",
+        subject="excel export",
+        statement="The attendee Excel export is broken above 500 rows and was reopened.",
+        status="reopened",
+    )
+    add(
+        "follow up with the sponsor about when the MoU will be signed",
+        type="task",
+        subject="sponsor mou follow-up",
+        statement="Someone must follow up with the sponsor about the MoU signing date.",
+        status="todo",
+    )
+    add(
+        "do we support offline check-in at the venue",
+        type="open_question",
+        subject="offline check-in",
+        statement="It is undecided whether offline check-in at the venue is supported.",
+    )
+    add(
+        "Do not change the registrations table schema before the fest",
+        type="risk",
+        subject="registrations schema",
+        statement="Do not change the registrations table schema before the fest; the check-in app reads it.",
+    )
+    add(
+        "Riya owns the registration API and the deploy scripts",
+        type="owner",
+        subject="deploy scripts",
+        statement="Riya owns the registration API and the deploy scripts.",
+        owner="Riya",
+    )
+    add(
+        "the CI build fails every Monday because the test API token expires weekly",
+        type="recurring_problem",
+        subject="ci token",
+        statement="CI fails every Monday because the test API token expires weekly.",
+    )
+    add(
+        "depends on the /v2/attendees endpoint",
+        type="dependency",
+        subject="v2 attendees endpoint",
+        statement="The mobile check-in app depends on the /v2/attendees endpoint.",
+    )
+    add(
+        "Our sponsor contact for the MoU is Arjun Rao",
+        type="contact",
+        subject="sponsor contact",
+        statement="Arjun Rao is the sponsor contact for the MoU.",
+    )
     # More sources on both sides of the Excel export disagreement (must become ONE conflict):
-    add("The attendee Excel export was marked Done last week", type="task", subject="excel export",
-        statement="The attendee Excel export was marked Done last week.", status="done", owner="Riya")
-    add("I have not started the fix yet", type="task", subject="excel export",
-        statement="The chunked-writes fix for the Excel export has not been started.", status="todo")
+    add(
+        "The attendee Excel export was marked Done last week",
+        type="task",
+        subject="excel export",
+        statement="The attendee Excel export was marked Done last week.",
+        status="done",
+        owner="Riya",
+    )
+    add(
+        "I have not started the fix yet",
+        type="task",
+        subject="excel export",
+        statement="The chunked-writes fix for the Excel export has not been started.",
+        status="todo",
+    )
     # A newer decision that reverses the older payments decision (timeline check):
-    add("we will switch online payments back on after the fest", type="task", subject="payments",
+    add(
+        "we will switch online payments back on after the fest",
+        type="task",
+        subject="payments",
         statement="Online payments will be switched back on after the fest because the MoU is signed.",
-        status="todo", owner="Karan")
-    add("Add PAYMENTS_ENABLED flag (default false)", type="task", subject="payments flag",
-        statement="Add the PAYMENTS_ENABLED flag with default false and hide the checkout button.", status="done",
-        owner="riya-dev")
-    add("I'll turn the flag on on 20 November after testing checkout", type="task", subject="payments flag",
+        status="todo",
+        owner="Karan",
+    )
+    add(
+        "Add PAYMENTS_ENABLED flag (default false)",
+        type="task",
+        subject="payments flag",
+        statement="Add the PAYMENTS_ENABLED flag with default false and hide the checkout button.",
+        status="done",
+        owner="riya-dev",
+    )
+    add(
+        "I'll turn the flag on on 20 November after testing checkout",
+        type="task",
+        subject="payments flag",
         statement="Karan will turn PAYMENTS_ENABLED on on 20 November after testing checkout.",
-        status="todo", owner="Karan")
+        status="todo",
+        owner="Karan",
+    )
     # Round 3 (living handover): newer evidence uploaded after the handover was approved.
-    add("The attendee Excel export fix is done and deployed", type="task", subject="excel export",
+    add(
+        "The attendee Excel export fix is done and deployed",
+        type="task",
+        subject="excel export",
         statement="The attendee Excel export fix is done and deployed; it now works above 500 rows.",
-        status="done", owner="Karan")
-    add("Venue Wi-Fi for check-in is provided by the college IT desk", type="dependency", subject="venue wifi",
-        statement="Check-in at the venue depends on Wi-Fi from the college IT desk.")
+        status="done",
+        owner="Karan",
+    )
+    add(
+        "Venue Wi-Fi for check-in is provided by the college IT desk",
+        type="dependency",
+        subject="venue wifi",
+        statement="Check-in at the venue depends on Wi-Fi from the college IT desk.",
+    )
     # A quote with altered words: must be rejected by the word-for-word check.
     meeting2 = _find(u, "Riya owns the registration API")
     if meeting2:
-        claims.append({"type": "owner", "subject": "registration api", "statement": "Riya owns the registration API.",
-                       "owner": "Riya", "citations": [{"evidence_id": meeting2,
-                                                       "quote": "Riya owns the registration API and all deploy scripts"}]})
+        claims.append(
+            {
+                "type": "owner",
+                "subject": "registration api",
+                "statement": "Riya owns the registration API.",
+                "owner": "Riya",
+                "citations": [{"evidence_id": meeting2, "quote": "Riya owns the registration API and all deploy scripts"}],
+            }
+        )
     # Deliberate mistakes the verifier must catch:
     meeting = _find(u, "Online payments are paused")
     if meeting:
-        claims.append({"type": "decision", "subject": "payments resume", "statement": "Payments will resume in November.",
-                       "citations": [{"evidence_id": meeting, "quote": "payments will resume in November"}]})
-        claims.append({"type": "risk", "subject": "registration api tests",
-                       "statement": "The registration API has no automated tests.",
-                       "citations": [{"evidence_id": meeting, "quote": "Online payments are paused because the sponsor"}]})
-        claims.append({"type": "task", "subject": "analytics", "statement": "Build an analytics page.", "status": "todo",
-                       "citations": [{"evidence_id": "E-999", "quote": "build an analytics page for sponsors"}]})
+        claims.append(
+            {
+                "type": "decision",
+                "subject": "payments resume",
+                "statement": "Payments will resume in November.",
+                "citations": [{"evidence_id": meeting, "quote": "payments will resume in November"}],
+            }
+        )
+        claims.append(
+            {
+                "type": "risk",
+                "subject": "registration api tests",
+                "statement": "The registration API has no automated tests.",
+                "citations": [{"evidence_id": meeting, "quote": "Online payments are paused because the sponsor"}],
+            }
+        )
+        claims.append(
+            {
+                "type": "task",
+                "subject": "analytics",
+                "statement": "Build an analytics page.",
+                "status": "todo",
+                "citations": [{"evidence_id": "E-999", "quote": "build an analytics page for sponsors"}],
+            }
+        )
     return {"claims": claims}
 
 
 def fake_support(prompt: str) -> dict:
     if "second opinion" in prompt:  # the other model, asked alone, agrees
-        return {"verdicts": [{"claim_ref": m.group(1), "verdict": "supports", "reason": "scripted second opinion"}
-                             for m in re.finditer(r"^(C-\d+) \[", prompt, re.M)]}
+        return {
+            "verdicts": [
+                {"claim_ref": m.group(1), "verdict": "supports", "reason": "scripted second opinion"}
+                for m in re.finditer(r"^(C-\d+) \[", prompt, re.M)
+            ]
+        }
     verdicts = []
     for m in re.finditer(r"^(C-\d+) \[(\w+)\] (.*?)$", prompt, re.M):
         code, statement = m.group(1), m.group(3)
@@ -131,12 +241,20 @@ def fake_ask(prompt: str) -> dict:
     u = _units(prompt.split("Evidence:", 1)[-1].strip() + "\n")
     if "invent" in question:
         code = next(iter(u), "E-1")
-        return {"answerable": True, "answer": "Made up.", "citations": [{"evidence_id": code, "quote": "words that are not there at all"}]}
+        return {
+            "answerable": True,
+            "answer": "Made up.",
+            "citations": [{"evidence_id": code, "quote": "words that are not there at all"}],
+        }
     for key, phrase, answer in (
-            ("payments", "keep online payments disabled with the PAYMENTS_ENABLED flag",
-             "Online payments are kept off with the PAYMENTS_ENABLED flag until the sponsor MoU is signed."),
-            ("sponsor contact", "Our sponsor contact for the MoU is Arjun Rao", "Arjun Rao is the sponsor contact for the MoU."),
-            ("parking", "Visitor parking is behind the library", "Visitor parking is behind the library.")):
+        (
+            "payments",
+            "keep online payments disabled with the PAYMENTS_ENABLED flag",
+            "Online payments are kept off with the PAYMENTS_ENABLED flag until the sponsor MoU is signed.",
+        ),
+        ("sponsor contact", "Our sponsor contact for the MoU is Arjun Rao", "Arjun Rao is the sponsor contact for the MoU."),
+        ("parking", "Visitor parking is behind the library", "Visitor parking is behind the library."),
+    ):
         if key in question:
             code = _find(u, phrase)
             if code:
@@ -146,11 +264,19 @@ def fake_ask(prompt: str) -> dict:
 
 def fake_ocr(prompt: str) -> dict:
     pages = [int(n) for n in re.findall(r"(\d+)", prompt.split("The images are pages", 1)[1].split("in that order")[0])]
-    return {"pages": [{"page": n, "text": f"Scanned whiteboard, page {n}\n\nThe venue projector is booked through the AV club."}
-                      for n in pages]}
+    return {
+        "pages": [
+            {"page": n, "text": f"Scanned whiteboard, page {n}\n\nThe venue projector is booked through the AV club."}
+            for n in pages
+        ]
+    }
 
 
 def fake_llm(system: str, prompt: str, schema) -> str:
+    if schema.__name__ == "SearchPlan":
+        return json.dumps({"keywords": []})  # no AI synonyms in the scripted tests unless a test adds them
+    if schema.__name__ == "TopicResult":
+        return json.dumps({"groups": []})
     if schema.__name__ == "Transcription":
         return json.dumps(fake_ocr(prompt))
     if schema.__name__ == "AskResult":
@@ -164,6 +290,9 @@ def fake_llm(system: str, prompt: str, schema) -> str:
 
 @pytest.fixture(autouse=True)
 def fake_ai():
+    from app import ratelimit
+
+    ratelimit.reset_all()
     set_providers_for_tests([FakeProvider(fake_llm)])
     yield
     set_providers_for_tests(None)
@@ -192,7 +321,7 @@ def signup(client, name: str = "Test Reviewer", email: str | None = None, passwo
 
 @pytest.fixture()
 def demo(client):
-    r = client.post("/auth/demo")
+    r = client.post("/auth/demo", json={"stage": "fresh"})
     assert r.status_code == 200, r.text
     data = r.json()
     people = {p["name"]: p["id"] for p in client.get("/auth/me", headers=auth(data["token"])).json()["people"]}

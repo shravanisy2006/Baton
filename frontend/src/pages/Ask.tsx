@@ -4,7 +4,19 @@ import { api } from "../lib/api";
 import { useApi } from "../lib/hooks";
 import { useProject } from "../lib/session";
 import type { Question, QuestionCitation } from "../lib/types";
-import { Button, Card, Empty, ErrorBox, Highlighted, LabelBadge, Notice, PageHeader, Pill, Spinner, input } from "../components/ui";
+import {
+  Button,
+  Card,
+  Empty,
+  ErrorBox,
+  Highlighted,
+  LabelBadge,
+  Notice,
+  PageHeader,
+  Pill,
+  Spinner,
+  input,
+} from "../components/ui";
 
 const EXAMPLES = [
   "What should I work on first?",
@@ -52,7 +64,7 @@ export default function AskPage() {
           </>
         }
       />
-      <Card className="p-4" >
+      <Card className="p-4">
         <form
           data-guide="ask-box"
           onSubmit={(e) => {
@@ -101,7 +113,8 @@ export default function AskPage() {
       )}
 
       <h2 className="mb-3 mt-8 flex items-center gap-2 font-semibold text-slate-900">
-        <MessageCircleQuestion className="h-4 w-4" /> {role === "incoming" || role === "viewer" ? "Your questions" : "Questions asked in this project"}
+        <MessageCircleQuestion className="h-4 w-4" />{" "}
+        {role === "incoming" || role === "viewer" ? "Your questions" : "Questions asked in this project"}
       </h2>
       {list.loading && <Spinner />}
       {list.error && <ErrorBox message={list.error.message} onRetry={() => list.reload()} />}
@@ -165,7 +178,8 @@ function QuestionCard({
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
             Drafted by AI from {q.citations.length} piece{q.citations.length === 1 ? "" : "s"} of evidence; every quote below was
             found word for word.
-            {q.rejected_quotes > 0 && ` ${q.rejected_quotes} quote${q.rejected_quotes === 1 ? " was" : "s were"} not found and removed.`}
+            {q.rejected_quotes > 0 &&
+              ` ${q.rejected_quotes} quote${q.rejected_quotes === 1 ? " was" : "s were"} not found and removed.`}
           </p>
         </>
       )}
@@ -174,7 +188,8 @@ function QuestionCard({
           <Notice tone="warn">
             <HelpCircle className="mr-1 inline h-4 w-4" />
             The project's files don't answer this, so Baton won't guess.
-            {q.rejected_quotes > 0 && ` (The AI's draft cited ${q.rejected_quotes} quote${q.rejected_quotes === 1 ? "" : "s"} that weren't in the sources, so it was discarded.)`}
+            {q.rejected_quotes > 0 &&
+              ` (The AI's draft cited ${q.rejected_quotes} quote${q.rejected_quotes === 1 ? "" : "s"} that weren't in the sources, so it was discarded.)`}
           </Notice>
         </div>
       )}

@@ -1,10 +1,11 @@
 """End-to-end tests for the evidence-to-handover workflow (the TESTING.md scenarios)."""
+
 import io
 
+from conftest import auth, signup
 from docx import Document
 
 from app.verify.service import find_quote
-from conftest import auth, signup
 
 REVIEWER, LEAVER, NEW, VIEWER = "Priya Nair", "Riya Sharma", "Karan Mehta", "Anika Joshi"
 
@@ -21,6 +22,7 @@ def by_statement(claims, text):
 
 # ---------- 1-3: parsing ----------
 
+
 def test_upload_pdf_docx_csv_and_reject_unsupported(client):
     tok = signup(client)
     pid = client.post("/projects", json={"name": "Parsing test"}, headers=auth(tok)).json()["id"]
@@ -30,6 +32,7 @@ def test_upload_pdf_docx_csv_and_reject_unsupported(client):
     buf = io.BytesIO()
     doc.save(buf)
     from reportlab.pdfgen import canvas
+
     pdf = io.BytesIO()
     c = canvas.Canvas(pdf)
     c.drawString(72, 720, "The deploy script must only run from the main branch.")
@@ -58,14 +61,19 @@ def test_redaction_removes_secrets(client):
     tok = signup(client)
     pid = client.post("/projects", json={"name": "Secrets"}, headers=auth(tok)).json()["id"]
     body = b"Deploy notes for the team.\n\napi_key = AIzaSyA1234567890abcdefghijklmnopqrstuv and call 9876543210 if stuck."
-    r = client.post(f"/projects/{pid}/sources/upload", files=[("files", ("n.txt", body, "text/plain"))],
-                    data={"access_label": "Team"}, headers=auth(tok))
+    r = client.post(
+        f"/projects/{pid}/sources/upload",
+        files=[("files", ("n.txt", body, "text/plain"))],
+        data={"access_label": "Team"},
+        headers=auth(tok),
+    )
     assert r.json()["results"][0]["source"]["redactions"] >= 2
     text = " ".join(e["text"] for e in client.get(f"/projects/{pid}/evidence", headers=auth(tok)).json()["evidence"])
     assert "AIza" not in text and "9876543210" not in text
 
 
 # ---------- 4-7: claims and verification ----------
+
 
 def test_quote_matcher_exact_fuzzy_and_invented():
     text = "Dropping Razorpay for now. The sponsor asked us to pause payments until the MoU is signed."
@@ -113,10 +121,11 @@ def test_claim_detail_has_highlight_offsets(client, demo):
     for cit in d["citations"]:
         text = cit["evidence"]["text"]
         assert cit["match"] in ("exact", "fuzzy")
-        assert text[cit["start"]:cit["end"]].lower().startswith(cit["quote"].lower()[:10])
+        assert text[cit["start"] : cit["end"]].lower().startswith(cit["quote"].lower()[:10])
 
 
 # ---------- 8-9: conflicts and gaps ----------
+
 
 def test_conflict_and_gaps_detected(client, demo):
     tok = auth(demo["tokens"][REVIEWER])
@@ -131,8 +140,12 @@ def test_conflict_and_gaps_detected(client, demo):
     # Two newer messages replace the same older decision -> still ONE timeline conflict.
     assert len(superseded) == 1 and len(superseded[0]["side_b"]) == 2
     assert any("switched back on" in c["statement"] for c in superseded[0]["side_b"])
-    assert len([g for g in client.get(f"/projects/{demo['project_id']}/gaps", headers=tok).json()["gaps"]
-                if g["kind"] == "conflict"]) == 2  # one question per conflict, not per pair
+    assert (
+        len(
+            [g for g in client.get(f"/projects/{demo['project_id']}/gaps", headers=tok).json()["gaps"] if g["kind"] == "conflict"]
+        )
+        == 2
+    )  # one question per conflict, not per pair
     gaps = client.get(f"/projects/{demo['project_id']}/gaps", headers=tok).json()["gaps"]
     kinds = {g["kind"] for g in gaps}
     assert {"missing_owner", "open_question", "conflict"} <= kinds
@@ -144,11 +157,11 @@ def test_leaver_answer_becomes_attested_evidence(client, demo):
     gaps = client.get(f"/projects/{pid}/gaps", headers=auth(demo["tokens"][LEAVER])).json()["gaps"]
     gap = next(g for g in gaps if g["kind"] == "missing_owner")
     # Only the departing member may answer.
-    r = client.post(f"/gaps/{gap['id']}/answer", json={"answer": "Priya should own it."},
-                    headers=auth(demo["tokens"][REVIEWER]))
+    r = client.post(f"/gaps/{gap['id']}/answer", json={"answer": "Priya should own it."}, headers=auth(demo["tokens"][REVIEWER]))
     assert r.status_code == 403
-    r = client.post(f"/gaps/{gap['id']}/answer", json={"answer": "Priya should follow up with Arjun."},
-                    headers=auth(demo["tokens"][LEAVER]))
+    r = client.post(
+        f"/gaps/{gap['id']}/answer", json={"answer": "Priya should follow up with Arjun."}, headers=auth(demo["tokens"][LEAVER])
+    )
     assert r.status_code == 200 and r.json()["status"] == "answered"
     ev = client.get(f"/evidence/{r.json()['answer_evidence_id']}", headers=auth(demo["tokens"][REVIEWER])).json()
     assert ev["kind"] == "attestation" and ev["author"] == LEAVER
@@ -157,6 +170,7 @@ def test_leaver_answer_becomes_attested_evidence(client, demo):
 
 
 # ---------- 10-12: review and handover ----------
+
 
 def _approve_all_resolvable(client, demo):
     tok = auth(demo["tokens"][REVIEWER])
@@ -171,8 +185,11 @@ def _approve_all_resolvable(client, demo):
             reopened = winner
         else:
             winner = conflict["side_b"][0]  # the newer decision
-        r = client.post(f"/conflicts/{conflict['id']}/resolve",
-                        json={"winner_claim_id": winner["id"], "note": "Newer source is current."}, headers=tok)
+        r = client.post(
+            f"/conflicts/{conflict['id']}/resolve",
+            json={"winner_claim_id": winner["id"], "note": "Newer source is current."},
+            headers=tok,
+        )
         assert r.status_code == 200 and r.json()["status"] == "resolved"
         if conflict["kind"] == "status":
             losers = [c for c in r.json()["side_a"] + r.json()["side_b"] if c["status"] == "done"]
@@ -194,14 +211,12 @@ def test_review_rules(client, demo):
     conflicting = next(c for c in data["claims"] if c["confidence"] == "conflicting")
     r = client.post(f"/claims/{conflicting['id']}/review", json={"action": "approve"}, headers=tok)
     assert r.status_code == 409  # resolve the conflict first
-    r = client.post(f"/claims/{invented['id']}/review", json={"action": "approve", "reason": "Confirmed verbally"},
-                    headers=tok)
+    r = client.post(f"/claims/{invented['id']}/review", json={"action": "approve", "reason": "Confirmed verbally"}, headers=tok)
     assert r.json()["confidence"] == "reviewer_asserted"
     r = client.post(f"/claims/{invented['id']}/review", json={"action": "reject", "reason": "Not real"}, headers=tok)
     assert r.json()["review_state"] == "rejected"
     # Non-reviewers cannot review.
-    r = client.post(f"/claims/{invented['id']}/review", json={"action": "approve"},
-                    headers=auth(demo["tokens"][LEAVER]))
+    r = client.post(f"/claims/{invented['id']}/review", json={"action": "approve"}, headers=auth(demo["tokens"][LEAVER]))
     assert r.status_code == 403
 
 
@@ -251,6 +266,7 @@ def test_handover_generation_links_and_role_views(client, demo):
 
 # ---------- 13: access control ----------
 
+
 def test_access_control(client, demo):
     pid = demo["project_id"]
     # Viewer and incoming member can't see raw claims, evidence lists or the audit log.
@@ -276,11 +292,16 @@ def test_access_control(client, demo):
 
 def test_ai_not_configured_is_reported(client):
     from app.llm.provider import set_providers_for_tests
+
     set_providers_for_tests([])
     tok = signup(client)
     pid = client.post("/projects", json={"name": "No AI"}, headers=auth(tok)).json()["id"]
-    client.post(f"/projects/{pid}/sources/upload", files=[("files", ("a.md", b"We decided to use Postgres for everything.", "text/markdown"))],
-                data={"access_label": "Team"}, headers=auth(tok))
+    client.post(
+        f"/projects/{pid}/sources/upload",
+        files=[("files", ("a.md", b"We decided to use Postgres for everything.", "text/markdown"))],
+        data={"access_label": "Team"},
+        headers=auth(tok),
+    )
     client.post(f"/projects/{pid}/analyse", headers=auth(tok))
     job = client.get(f"/projects/{pid}/jobs/latest", headers=auth(tok)).json()
     assert job["status"] == "failed" and "GEMINI_API_KEY" in job["error"]
@@ -289,34 +310,60 @@ def test_ai_not_configured_is_reported(client):
 def test_corrected_state_enters_handover(client, demo):
     tok = auth(demo["tokens"][REVIEWER])
     claim = by_statement(claims_of(client, demo), "CI fails every Monday")
-    r = client.post(f"/claims/{claim['id']}/review",
-                    json={"action": "edit", "statement": "CI fails every Monday when the weekly test token expires."},
-                    headers=tok)
+    r = client.post(
+        f"/claims/{claim['id']}/review",
+        json={"action": "edit", "statement": "CI fails every Monday when the weekly test token expires."},
+        headers=tok,
+    )
     assert r.json()["review_state"] == "corrected" and r.json()["confidence"] == "reviewer_asserted"
     assert r.json()["original_statement"] != r.json()["statement"]
 
 
 def test_chat_and_json_imports(client):
     import json as _json
+
     tok = signup(client)
     pid = client.post("/projects", json={"name": "Imports"}, headers=auth(tok)).json()["id"]
-    chat = (b"28/10/2026, 18:04 - Priya: The sponsor signed the MoU today!\n"
-            b"28/10/2026, 18:06 - Priya: Karan please turn payments back on after the fest\n"
-            b"and test checkout first.\n"
-            b"[29/10/26, 09:12:30] Riya: CI failed again because the token expired.\n")
-    issues = _json.dumps([{"number": 92, "title": "Excel export breaks above 500 rows", "state": "open",
-                           "state_reason": "reopened", "body": "Times out above 500 rows.",
-                           "user": {"login": "anika"}, "updated_at": "2026-10-02T10:00:00Z",
-                           "comments": [{"body": "I have not started the fix yet.", "user": {"login": "riya-dev"},
-                                         "created_at": "2026-10-03T09:00:00Z"}]}]).encode()
-    slack = _json.dumps([{"type": "message", "user_name": "priya", "text": "Freeze the schema before the fest.",
-                          "ts": "1790000000.000100"}]).encode()
-    r = client.post(f"/projects/{pid}/sources/upload", data={"access_label": "Team"}, headers=auth(tok), files=[
-        ("files", ("whatsapp.txt", chat, "text/plain")),
-        ("files", ("issues.json", issues, "application/json")),
-        ("files", ("slack.json", slack, "application/json")),
-        ("files", ("broken.json", b"{not json", "application/json")),
-    ])
+    chat = (
+        b"28/10/2026, 18:04 - Priya: The sponsor signed the MoU today!\n"
+        b"28/10/2026, 18:06 - Priya: Karan please turn payments back on after the fest\n"
+        b"and test checkout first.\n"
+        b"[29/10/26, 09:12:30] Riya: CI failed again because the token expired.\n"
+    )
+    issues = _json.dumps(
+        [
+            {
+                "number": 92,
+                "title": "Excel export breaks above 500 rows",
+                "state": "open",
+                "state_reason": "reopened",
+                "body": "Times out above 500 rows.",
+                "user": {"login": "anika"},
+                "updated_at": "2026-10-02T10:00:00Z",
+                "comments": [
+                    {
+                        "body": "I have not started the fix yet.",
+                        "user": {"login": "riya-dev"},
+                        "created_at": "2026-10-03T09:00:00Z",
+                    }
+                ],
+            }
+        ]
+    ).encode()
+    slack = _json.dumps(
+        [{"type": "message", "user_name": "priya", "text": "Freeze the schema before the fest.", "ts": "1790000000.000100"}]
+    ).encode()
+    r = client.post(
+        f"/projects/{pid}/sources/upload",
+        data={"access_label": "Team"},
+        headers=auth(tok),
+        files=[
+            ("files", ("whatsapp.txt", chat, "text/plain")),
+            ("files", ("issues.json", issues, "application/json")),
+            ("files", ("slack.json", slack, "application/json")),
+            ("files", ("broken.json", b"{not json", "application/json")),
+        ],
+    )
     res = {x["filename"]: x for x in r.json()["results"]}
     assert res["whatsapp.txt"]["source"]["kind"] == "chat" and res["whatsapp.txt"]["source"]["unit_count"] == 3
     assert res["issues.json"]["source"]["unit_count"] == 2 and res["slack.json"]["source"]["unit_count"] == 1
@@ -332,13 +379,17 @@ def test_chat_and_json_imports(client):
 
 # ---------- own project: a judge brings their own files and people ----------
 
+
 def test_own_project_from_scratch(client):
     import zipfile
 
     tok = signup(client, name="Dr. Mehra")
-    body = {"name": "Judge project", "your_name": "Dr. Mehra",
-            "departing": {"name": "Riya Sharma", "handle": "riya-dev", "access_level": "Leads"},
-            "incoming": {"name": "Karan Mehta", "handle": "karan-m", "access_level": "Leads"}}
+    body = {
+        "name": "Judge project",
+        "your_name": "Dr. Mehra",
+        "departing": {"name": "Riya Sharma", "handle": "riya-dev", "access_level": "Leads"},
+        "incoming": {"name": "Karan Mehta", "handle": "karan-m", "access_level": "Leads"},
+    }
     pid = client.post("/projects", json=body, headers=auth(tok)).json()["id"]
     ov = client.get(f"/projects/{pid}", headers=auth(tok)).json()
     assert ov["project"]["departing"] == "Riya Sharma" and ov["project"]["incoming"] == "Karan Mehta"
@@ -349,9 +400,14 @@ def test_own_project_from_scratch(client):
     assert "LABELS.txt" in z.namelist()
     from app.demo import SEED_FILES
     from app.models import LABELS
+
     for filename, label in SEED_FILES:
-        r = client.post(f"/projects/{pid}/sources/upload", files=[("files", (filename, z.read(filename)))],
-                        data={"access_label": LABELS[label]}, headers=auth(tok))
+        r = client.post(
+            f"/projects/{pid}/sources/upload",
+            files=[("files", (filename, z.read(filename)))],
+            data={"access_label": LABELS[label]},
+            headers=auth(tok),
+        )
         assert r.json()["results"][0]["ok"], r.text
     assert client.post(f"/projects/{pid}/analyse", headers=auth(tok)).status_code == 200
     ov = client.get(f"/projects/{pid}", headers=auth(tok)).json()
@@ -359,8 +415,9 @@ def test_own_project_from_scratch(client):
 
     # Resolve conflicts, approve what can be approved, and share the handover.
     for k in client.get(f"/projects/{pid}/conflicts", headers=auth(tok)).json()["conflicts"]:
-        client.post(f"/conflicts/{k['id']}/resolve", json={"winner_claim_id": k["side_b"][0]["id"], "note": "newer"},
-                    headers=auth(tok))
+        client.post(
+            f"/conflicts/{k['id']}/resolve", json={"winner_claim_id": k["side_b"][0]["id"], "note": "newer"}, headers=auth(tok)
+        )
     for c in client.get(f"/projects/{pid}/claims", headers=auth(tok)).json()["claims"]:
         if c["review_state"] == "pending" and c["confidence"] in ("verified", "corroborated", "weak"):
             client.post(f"/claims/{c['id']}/review", json={"action": "approve"}, headers=auth(tok))

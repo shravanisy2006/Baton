@@ -1,4 +1,5 @@
 """Baton API. Run locally with:  uvicorn app.main:app --reload  (from the backend folder)."""
+
 import logging
 from contextlib import asynccontextmanager
 
@@ -6,6 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from .ask.router import router as ask_router
 from .audit.router import router as audit_router
 from .auth.router import router as auth_router
 from .config import get_settings
@@ -18,8 +20,6 @@ from .projects.router import router as projects_router
 from .share.router import router as share_router
 from .sources.router import router as sources_router
 from .team.router import router as team_router
-from .judge import router as judge_router
-from .ask.router import router as ask_router
 from .verify.router import router as claims_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -28,33 +28,21 @@ log = logging.getLogger("baton")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    settings = get_settings()
+    settings.check()  # refuses to start in production with the development secret
     init_db()
-    _fail_interrupted_jobs()
-    from .judge import ensure as ensure_judge_demo
+    if settings.run_worker:
+        from .jobs import recover_interrupted, start_workers
 
-    ensure_judge_demo()  # builds the shared judge demo in the background if it doesn't exist yet
-    if get_settings().app_secret.startswith("dev-only"):
+        recover_interrupted()
+        start_workers()
+    if settings.app_secret.startswith("dev-only"):
         log.warning("APP_SECRET is the development default. Set a long random APP_SECRET in production.")
-    log.info("Baton API ready. AI: %s", ai_status())
+    log.info("Baton API ready. AI: %s. Email: %s.", ai_status(), "configured" if settings.email_configured else "not configured")
     yield
+    from .jobs import stop_workers
 
-
-def _fail_interrupted_jobs() -> None:
-    """A job still 'running' at startup was cut off by a restart; mark it failed so it can be re-run."""
-    from datetime import datetime, timezone
-
-    from .db import SessionLocal
-    from .models import Job
-
-    with SessionLocal() as db:
-        stuck = db.query(Job).filter(Job.status.in_(("queued", "running"))).all()
-        for j in stuck:
-            j.status = "failed"
-            j.error = "The server restarted while this analysis was running. Press Re-run analysis."
-            j.finished_at = datetime.now(timezone.utc)
-        db.commit()
-        if stuck:
-            log.warning("Marked %d interrupted analysis job(s) as failed.", len(stuck))
+    stop_workers()
 
 
 app = FastAPI(
@@ -65,22 +53,52 @@ app = FastAPI(
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=get_settings().cors_origins,
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_origins=get_settings().cors_origins,  # exact addresses only (CORS_ORIGINS); no wildcards
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["Content-Disposition"],
 )
 
-for r in (auth_router, projects_router, sources_router, evidence_router, claims_router, detect_router,
-          handover_router, share_router, audit_router, team_router, ask_router, judge_router):
+for r in (
+    auth_router,
+    projects_router,
+    sources_router,
+    evidence_router,
+    claims_router,
+    detect_router,
+    handover_router,
+    share_router,
+    audit_router,
+    team_router,
+    ask_router,
+):
     app.include_router(r)
 
 
 @app.get("/health", tags=["system"])
 def health():
-    return {"ok": True, "ai": ai_status()}
+    """Liveness and readiness: database reachable, AI configured, job workers running."""
+    from sqlalchemy import text
+
+    from .db import engine
+    from .jobs import status as jobs_status
+
+    db_ok = True
+    try:
+        with engine.connect() as c:
+            c.execute(text("SELECT 1"))
+    except Exception:  # noqa: BLE001
+        db_ok = False
+    s = get_settings()
+    body = {
+        "ok": db_ok,
+        "database": db_ok,
+        "ai": ai_status(),
+        "email": s.email_configured,
+        "jobs": jobs_status() if db_ok else None,
+    }
+    return JSONResponse(body, status_code=200 if db_ok else 503)
 
 
 @app.exception_handler(Exception)

@@ -31,14 +31,14 @@ export default function GapsPage() {
   return (
     <div>
       <PageHeader
-        title="Gaps & conflicts"
+        title="Questions & disagreements"
         subtitle="Baton doesn't guess. Missing facts become questions for the person leaving, and sources that disagree stay side by side until a reviewer decides."
       />
       {isLeaver && (
         <div className="mb-5">
           <Notice>
             <b>Departure interview.</b> These are the only things the project's sources can't answer. Your answers are saved as
-            separate, clearly labelled "Leaver-attested" evidence.
+            separate, clearly labelled as their own answer.
           </Notice>
         </div>
       )}
@@ -48,7 +48,7 @@ export default function GapsPage() {
       </h2>
       {conflicts.loading && <Spinner />}
       {conflicts.error && <ErrorBox message={conflicts.error.message} />}
-      {conflicts.data && conflicts.data.conflicts.length === 0 && <Empty title="No conflicting sources found" />}
+      {conflicts.data && conflicts.data.conflicts.length === 0 && <Empty title="No disagreements between sources" />}
       <div className="mb-8 space-y-4">
         {conflicts.data?.conflicts.map((k) => (
           <ConflictCard key={k.id} k={k} canResolve={canReview} onDone={refresh} />
@@ -60,7 +60,7 @@ export default function GapsPage() {
       </h2>
       {gaps.loading && <Spinner />}
       {gaps.error && <ErrorBox message={gaps.error.message} />}
-      {gaps.data && gaps.data.gaps.length === 0 && <Empty title="No gaps found" />}
+      {gaps.data && gaps.data.gaps.length === 0 && <Empty title="No open questions" />}
       <div className="space-y-3">
         {gaps.data?.gaps.map((g) => (
           <GapCard key={g.id} g={g} isLeaver={isLeaver} canReview={canReview} onDone={refresh} />
@@ -77,7 +77,9 @@ function Side({ claims, label, newer, winner }: { claims: Claim[]; label: string
         <span className="text-xs font-semibold text-slate-500">{label}</span>
         {newer && <Pill className="bg-sky-100 text-sky-800">Newer evidence</Pill>}
         {winner && <Pill className="bg-emerald-600 text-white">Current</Pill>}
-        <span className="text-xs text-slate-400">{claims.length} source{claims.length === 1 ? "" : "s"}</span>
+        <span className="text-xs text-slate-400">
+          {claims.length} source{claims.length === 1 ? "" : "s"}
+        </span>
       </div>
       <div className="space-y-3">
         {claims.map((c) => (
@@ -87,9 +89,11 @@ function Side({ claims, label, newer, winner }: { claims: Claim[]; label: string
               {c.review_state === "superseded" && <Pill className="bg-slate-100 text-slate-500">Superseded</Pill>}
             </div>
             <div className="space-y-2">
-              {c.citations.filter((x) => x.match === "exact").map((x, i) => (
-                <CitationView key={i} c={x} />
-              ))}
+              {c.citations
+                .filter((x) => x.match === "exact")
+                .map((x, i) => (
+                  <CitationView key={i} c={x} />
+                ))}
             </div>
           </div>
         ))}
@@ -133,7 +137,11 @@ function ConflictCard({ k, canResolve, onDone }: { k: Conflict; canResolve: bool
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <Pill
           className={
-            k.status === "open" ? "bg-orange-100 text-orange-800" : k.status === "kept" ? "bg-slate-100 text-slate-700" : "bg-emerald-50 text-emerald-700"
+            k.status === "open"
+              ? "bg-orange-100 text-orange-800"
+              : k.status === "kept"
+                ? "bg-slate-100 text-slate-700"
+                : "bg-emerald-50 text-emerald-700"
           }
         >
           {k.status === "open" ? "Needs a decision" : k.status === "kept" ? "Both kept visible" : "Resolved"}
@@ -148,19 +156,34 @@ function ConflictCard({ k, canResolve, onDone }: { k: Conflict; canResolve: bool
       {k.resolution_note && <p className="mt-3 text-sm text-slate-600">{k.resolution_note}</p>}
       {canResolve && k.status === "open" && sideA.length > 0 && sideB.length > 0 && (
         <div className="mt-4 space-y-2 border-t border-slate-100 pt-4">
-          <input className={input} placeholder="Note for the record (e.g. 'Task board was outdated')" value={note} onChange={(e) => setNote(e.target.value)} />
+          <input
+            className={input}
+            placeholder="Note for the record (e.g. 'Task board was outdated')"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
           <div className="flex flex-wrap gap-2" data-guide="resolve">
-            <Button size="sm" variant="success" loading={busy === "a"} onClick={() => resolve({ winner_claim_id: sideA[0].id }, "a")}>
+            <Button
+              size="sm"
+              variant="success"
+              loading={busy === "a"}
+              onClick={() => resolve({ winner_claim_id: sideA[0].id }, "a")}
+            >
               {k.kind === "superseded" ? "Older still applies" : "A is current"}
             </Button>
-            <Button size="sm" variant="success" loading={busy === "b"} onClick={() => resolve({ winner_claim_id: sideB[0].id }, "b")}>
+            <Button
+              size="sm"
+              variant="success"
+              loading={busy === "b"}
+              onClick={() => resolve({ winner_claim_id: sideB[0].id }, "b")}
+            >
               {k.kind === "superseded" ? "Newer replaces it" : "B is current"}
             </Button>
             <Button size="sm" variant="secondary" loading={busy === "keep"} onClick={() => resolve({ keep_both: true }, "keep")}>
               Can't tell — keep both visible
             </Button>
           </div>
-          <p className="text-xs text-slate-500">Choosing a side marks every claim on the other side as superseded.</p>
+          <p className="text-xs text-slate-500">Choosing a side marks everything on the other side as out of date.</p>
           {err && <ErrorBox message={err} />}
         </div>
       )}
@@ -211,7 +234,15 @@ function GapCard({ g, isLeaver, canReview, onDone }: { g: Gap; isLeaver: boolean
             submit(`/gaps/${g.id}/answer`, { answer });
           }}
         >
-          <textarea className={input} rows={2} placeholder="Your answer…" value={answer} onChange={(e) => setAnswer(e.target.value)} required minLength={2} />
+          <textarea
+            className={input}
+            rows={2}
+            placeholder="Your answer…"
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+            required
+            minLength={2}
+          />
           <Button type="submit" size="sm" loading={busy}>
             Save answer
           </Button>
@@ -219,11 +250,24 @@ function GapCard({ g, isLeaver, canReview, onDone }: { g: Gap; isLeaver: boolean
       )}
       {g.status === "open" && canReview && !isLeaver && g.kind !== "asked" && (
         <div className="mt-3 flex flex-wrap gap-2">
-          <input className={input + " sm:max-w-xs"} placeholder="Reason to close without an answer" value={reason} onChange={(e) => setReason(e.target.value)} />
-          <Button size="sm" variant="secondary" loading={busy} disabled={reason.trim().length < 2} onClick={() => submit(`/gaps/${g.id}/dismiss`, { reason })}>
+          <input
+            className={input + " sm:max-w-xs"}
+            placeholder="Reason to close without an answer"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
+          <Button
+            size="sm"
+            variant="secondary"
+            loading={busy}
+            disabled={reason.trim().length < 2}
+            onClick={() => submit(`/gaps/${g.id}/dismiss`, { reason })}
+          >
             Close question
           </Button>
-          <span className="self-center text-xs text-slate-500">Only the departing member can answer — switch to them at the top.</span>
+          <span className="self-center text-xs text-slate-500">
+            Only the departing member can answer — switch to them at the top.
+          </span>
         </div>
       )}
       {err && (

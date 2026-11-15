@@ -49,12 +49,12 @@ export default function ReviewPage() {
     <div>
       <PageHeader
         title="Review"
-        subtitle="Check each claim against its highlighted source. Only approved claims go into the handover, and unverified claims can never enter it as verified facts."
+        subtitle="Check each finding against the highlighted words in its file. Only what you approve goes into the handover."
       />
       {o.counts.open_conflicts > 0 && (
         <div className="mb-4">
           <Notice tone="warn">
-            {o.counts.open_conflicts} conflict(s) need a decision before those claims can be approved.{" "}
+            {o.counts.open_conflicts} conflict(s) need a decision before those findings can be approved.{" "}
             <Link className="font-medium underline" to={`/p/${pid}/gaps`}>
               Resolve conflicts
             </Link>
@@ -66,7 +66,10 @@ export default function ReviewPage() {
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={cx("rounded-md px-3 py-1.5 font-medium", tab === t.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-600")}
+            className={cx(
+              "rounded-md px-3 py-1.5 font-medium",
+              tab === t.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-600",
+            )}
           >
             {t.label}
             {t.key === "pending" && ` (${count("pending")})`}
@@ -77,7 +80,10 @@ export default function ReviewPage() {
       {list.loading && <Spinner />}
       {list.error && <ErrorBox message={list.error.message} onRetry={list.reload} />}
       {list.data && claims.length === 0 && (
-        <Empty icon={<ClipboardCheck className="h-8 w-8" />} title={tab === "pending" ? "Nothing left to review" : "Nothing here"}>
+        <Empty
+          icon={<ClipboardCheck className="h-8 w-8" />}
+          title={tab === "pending" ? "Nothing left to review" : "Nothing here"}
+        >
           {tab === "pending" && list.data.claims.length > 0 && (
             <Link className="font-medium text-brand-700 underline" to={`/p/${pid}/handover`}>
               Generate the handover →
@@ -169,16 +175,16 @@ function ReviewPanel({ id, onDone }: { id: string; onDone: () => void }) {
 
       {c.review_state === "pending" ? (
         <div className="space-y-3 border-t border-slate-100 pt-4">
-          {blocked && <Notice tone="warn">This claim is in an open conflict. Resolve it on the Gaps & Conflicts page first.</Notice>}
+          {blocked && <Notice tone="warn">Sources disagree about this. Decide between them on the Questions page first.</Notice>}
           {unverified && (
             <Notice tone="warn">
-              This claim failed verification. You can reject it, or approve it only as <b>Reviewer-asserted</b> with a reason.
+              This finding isn't backed by its file. Reject it, or approve it as <b>your own decision</b> with a reason.
             </Notice>
           )}
           {canRecheck && (
             <Notice tone="info">
-              The quote was found word for word, but the AI check said it doesn't back the claim. If you think the check was
-              too strict, ask the other AI model to judge it on its own.{" "}
+              The quote was found word for word, but the AI check said it doesn't back the claim. If you think the check was too
+              strict, ask the other AI model to judge it on its own.{" "}
               <Button size="sm" variant="secondary" onClick={secondOpinion} loading={busy && !mode} className="ml-1 mt-1">
                 <RefreshCw className="h-3.5 w-3.5" /> Ask the AI again (second opinion)
               </Button>
@@ -234,7 +240,7 @@ function ReviewPanel({ id, onDone }: { id: string; onDone: () => void }) {
           }}
         >
           <label className="text-sm font-medium text-slate-700">
-            {mode === "edit" && "Corrected statement — it goes into the handover marked Corrected / Reviewer-asserted"}
+            {mode === "edit" && "Corrected statement — it goes into the handover marked as corrected by you"}
             {mode === "reassign" && "New owner"}
             {mode === "reject" && "Why reject? (optional)"}
             {mode === "assert" && "Why is this true even though the evidence doesn't prove it?"}
@@ -242,7 +248,13 @@ function ReviewPanel({ id, onDone }: { id: string; onDone: () => void }) {
           {mode === "edit" ? (
             <textarea className={input} rows={3} value={text} onChange={(e) => setText(e.target.value)} required />
           ) : (
-            <input className={input} value={text} onChange={(e) => setText(e.target.value)} required={mode !== "reject"} autoFocus />
+            <input
+              className={input}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              required={mode !== "reject"}
+              autoFocus
+            />
           )}
           <div className="flex gap-2">
             <Button type="submit" size="sm" loading={busy}>

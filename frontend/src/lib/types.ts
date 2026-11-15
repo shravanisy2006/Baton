@@ -1,12 +1,5 @@
 export type Confidence =
-  | "verified"
-  | "corroborated"
-  | "weak"
-  | "conflicting"
-  | "unverified"
-  | "leaver_attested"
-  | "reviewer_asserted"
-  | "unknown";
+  "verified" | "corroborated" | "weak" | "conflicting" | "unverified" | "leaver_attested" | "reviewer_asserted" | "unknown";
 
 export interface Person {
   id: string;
@@ -22,6 +15,8 @@ export interface Me {
   previewing: boolean;
   registered: boolean;
   is_demo: boolean;
+  email_verified: boolean;
+  email_configured: boolean;
   people: Person[];
   projects: { id: string; name: string; is_demo: boolean; role: string }[];
 }
@@ -33,6 +28,8 @@ export interface Invite {
   access_level: string;
   state: "pending" | "accepted" | "revoked" | "expired";
   email_hint: string | null;
+  locked_to_email?: boolean;
+  email_status?: "sent" | "failed" | "not_configured" | null;
   created_at: string;
   expires_at: string;
   token?: string;
@@ -96,7 +93,14 @@ export interface Job {
 }
 
 export interface Overview {
-  project: { id: string; name: string; description: string; is_demo: boolean; is_judge_demo?: boolean; departing: string | null; incoming: string | null };
+  project: {
+    id: string;
+    name: string;
+    description: string;
+    is_demo: boolean;
+    departing: string | null;
+    incoming: string | null;
+  };
   me: { user_id: string; name: string; role: string; access_level: string };
   members: Member[];
   counts: Record<string, number>;
@@ -116,7 +120,7 @@ export interface Source {
   error: string | null;
   unit_count: number;
   redactions: number;
-  coverage: { skipped?: string[]; skipped_count?: number; storage_error?: string; ocr_pages?: number };
+  coverage: { skipped?: string[]; skipped_count?: number; ocr_pages?: number; flagged_instructions?: number };
   created_at: string;
 }
 
@@ -131,6 +135,7 @@ export interface Evidence {
   location: Record<string, string | number>;
   access_label: string;
   source_type?: string | null;
+  flags?: string[];
   text: string;
 }
 
@@ -232,7 +237,14 @@ export interface HandoverItem {
   review_state?: string;
   change?: "added" | "changed";
   changed_since_approval?: string;
-  newer_evidence?: { code: string; quote: string; source: string; author: string | null; date: string | null; statement: string }[];
+  newer_evidence?: {
+    code: string;
+    quote: string;
+    source: string;
+    author: string | null;
+    date: string | null;
+    statement: string;
+  }[];
   evidence: HandoverEvidence[];
 }
 

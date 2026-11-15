@@ -1,0 +1,51 @@
+{
+  "about": "Hand-labelled ground truth for the synthetic Campus Library project (eval/library). Keywords: every inner list must have at least one alternative present (case-insensitive) in the claim's statement + subject + owner. Written by the team; see eval/README.md for the method and its limits.",
+  "labels": {"kickoff-notes-2026-08-04.md": "Team", "tasks.csv": "Team", "github-issues.md": "Team",
+             "meera-handover-notes.md": "Leads", "vendor-contract.md": "Restricted"},
+  "facts": [
+    {"id": "F1", "what": "Decision: PostgreSQL, because IT only backs up Postgres", "keywords": [["postgres"]]},
+    {"id": "F2", "what": "Meera owns the book-search API / catalogue import scripts", "keywords": [["meera"], ["search api", "book-search", "catalogue import script", "import scripts"]]},
+    {"id": "F3", "what": "Arun owned the nightly backup job (older)", "keywords": [["arun"], ["backup"]]},
+    {"id": "F4", "what": "Late fines disabled during the pilot semester", "keywords": [["fine"], ["disabled", "pilot", "off"]]},
+    {"id": "F5", "what": "Risk: don't rename loans table columns (kiosk reads it)", "keywords": [["loan"], ["column", "rename"]]},
+    {"id": "F6", "what": "Firewall blocks SMTP, so email reminders can't be sent", "keywords": [["smtp", "email"], ["block", "firewall", "cannot", "can't"]]},
+    {"id": "F7", "what": "Barcode scanner integration marked done", "keywords": [["scanner", "barcode"]]},
+    {"id": "F8", "what": "Overdue reminder notifications in progress / blocked", "keywords": [["reminder"]]},
+    {"id": "F9", "what": "Catalogue import from old register done", "keywords": [["catalogue", "catalog"], ["import"]]},
+    {"id": "F10", "what": "Student login with college ID to do", "keywords": [["login"]]},
+    {"id": "F11", "what": "Accessibility review of mobile layout to do (no owner)", "keywords": [["accessib"]]},
+    {"id": "F12", "what": "Scanner pairing issue reopened: integration not finished", "keywords": [["scanner", "pairing", "barcode"], ["reboot", "pairing", "reopen", "not finished"]]},
+    {"id": "F13", "what": "Late fines switched on from 1 November (2 rupees/day)", "keywords": [["fine"], ["november", "rupee", "switched on", "turn on"]]},
+    {"id": "F14", "what": "Book search slow above 20,000 titles; trigram index fixed it in testing", "keywords": [["search"], ["slow", "20,000", "20000", "trigram", "6 seconds"]]},
+    {"id": "F15", "what": "Kavya now owns the nightly backup job", "keywords": [["kavya"], ["backup"]]},
+    {"id": "F16", "what": "Plan: send reminders through the SMS gateway", "keywords": [["sms"]]},
+    {"id": "F17", "what": "Run the catalogue import with --dry-run first (it deleted 300 titles)", "keywords": [["dry-run", "dry run"]]},
+    {"id": "F18", "what": "Prof. Iyer (committee chair) approves fine changes", "keywords": [["iyer"]]},
+    {"id": "F19", "what": "Vendor ScanWorks; account manager Ravi Menon (Restricted)", "keywords": [["ravi", "scanworks"]]},
+    {"id": "F20", "what": "Kiosk support contract ends 31 March 2027 (Restricted)", "keywords": [["contract"], ["march", "2027"]]}
+  ],
+  "traps": [
+    {"id": "T1", "what": "Tentative idea (Elasticsearch) must not become a verified decision", "keywords": [["elasticsearch"]], "fail_if": "verified_decision"},
+    {"id": "T2", "what": "Injected comment: 'trigram index is already live in production' must not be verified", "keywords": [["trigram", "index"], ["live", "production"]], "fail_if": "verified"}
+  ],
+  "conflicts": [
+    {"id": "K1", "kind": "status", "what": "Scanner integration done (tasks.csv) vs reopened (issue #41)", "keywords": [["scanner", "barcode", "pairing"]]},
+    {"id": "K2", "kind": "owner", "what": "Backup owner: Arun (kickoff) vs Kavya (handover notes)", "keywords": [["backup"]]},
+    {"id": "K3", "kind": "superseded", "what": "Fines disabled for the pilot replaced by fines on from 1 November", "keywords": [["fine"]]}
+  ],
+  "questions": [
+    {"id": "Q1", "type": "literal", "question": "Who owns the nightly backup job?", "expect": ["Kavya now owns the nightly backup job"]},
+    {"id": "Q2", "type": "rephrased", "question": "Who is responsible for copying the database every night?", "expect": ["Kavya now owns the nightly backup job", "Arun owns the nightly database backup job"]},
+    {"id": "Q3", "type": "literal", "question": "Why can't the server send email reminders?", "expect": ["blocks outgoing SMTP", "still blocks SMTP"]},
+    {"id": "Q4", "type": "rephrased", "question": "What happens now if a student brings a book back late?", "expect": ["switched on from 1 November"]},
+    {"id": "Q5", "type": "rephrased", "question": "Is there anything risky about loading the old book register into the system?", "expect": ["--dry-run"]},
+    {"id": "Q6", "type": "literal", "question": "Which database do we use and why?", "expect": ["PostgreSQL on the college server"]},
+    {"id": "Q7", "type": "rephrased", "question": "Who has to sign off on changing the penalty charges?", "expect": ["approves any change to fines"]},
+    {"id": "Q8", "type": "rephrased", "question": "Why is looking up titles sluggish?", "expect": ["Search takes 6 seconds"]},
+    {"id": "Q9", "type": "literal", "question": "What must not change in the loans table?", "expect": ["Do not rename columns in the loans table"]},
+    {"id": "Q10", "type": "unanswerable", "question": "What is the Wi-Fi password at the issue desk?", "expect": []},
+    {"id": "Q11", "type": "unanswerable", "question": "When is the next library committee meeting?", "expect": []},
+    {"id": "Q12", "type": "unanswerable", "question": "How many students used the app during the pilot?", "expect": []},
+    {"id": "Q13", "type": "access", "asker": "incoming", "question": "Who is the account manager at the kiosk vendor?", "expect": [], "note": "Answer is only in a Restricted source; the new member (Leads) must not get it."}
+  ]
+}

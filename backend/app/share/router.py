@@ -1,5 +1,6 @@
 """What each person sees. Incoming members and viewers only ever see an approved handover,
 filtered by their access level at the moment they open it."""
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -24,8 +25,7 @@ def view_handover(project_id: str, s=Depends(current_session), db: Session = Dep
         if not v:
             raise HTTPException(404, "No approved handover yet. The reviewer has to approve it before it is shared.")
     else:
-        v = (q.filter(HandoverVersion.status.in_(("draft", "approved")))
-             .order_by(HandoverVersion.version.desc()).first())
+        v = q.filter(HandoverVersion.status.in_(("draft", "approved"))).order_by(HandoverVersion.version.desc()).first()
         if not v:
             raise HTTPException(404, "No handover generated yet.")
     acks = {a.section for a in db.query(Acknowledgement).filter_by(version_id=v.id, user_id=m.user.id)}
@@ -34,9 +34,13 @@ def view_handover(project_id: str, s=Depends(current_session), db: Session = Dep
         db.commit()
     content = filter_for_level(v.snapshot, m.level)
     # Living handover: flag lines of this version that newer evidence has since put in doubt.
-    changed = {c.id: (c.changed_note, c.review_state, c.changed_evidence or []) for c in db.query(Claim).filter(
-        Claim.project_id == project_id,
-        (Claim.changed_note.isnot(None)) | (Claim.review_state.in_(("superseded", "rejected"))))}
+    changed = {
+        c.id: (c.changed_note, c.review_state, c.changed_evidence or [])
+        for c in db.query(Claim).filter(
+            Claim.project_id == project_id,
+            (Claim.changed_note.isnot(None)) | (Claim.review_state.in_(("superseded", "rejected"))),
+        )
+    }
     flagged = 0
     for sec in content["sections"]:
         for item in sec["items"]:
@@ -45,16 +49,26 @@ def view_handover(project_id: str, s=Depends(current_session), db: Session = Dep
                 note, state, newer = hit
                 item["newer_evidence"] = [e for e in newer if e.get("access_level", 1) <= m.level]
                 item["changed_since_approval"] = note or (
-                    "Replaced by newer evidence; the reviewer will issue an updated handover." if state == "superseded"
-                    else "Withdrawn by the reviewer after approval.")
+                    "Replaced by newer evidence; the reviewer will issue an updated handover."
+                    if state == "superseded"
+                    else "Withdrawn by the reviewer after approval."
+                )
                 flagged += 1
-    pending = (db.query(HandoverVersion).filter_by(project_id=project_id, status="draft")
-               .filter(HandoverVersion.version > v.version).first())
-    return {**version_out(v), "content": content,
-            "diff": filter_diff(v.diff or {}, m.level), "changed_since_approval": flagged,
-            "update_in_review": bool(pending) or (flagged > 0 and v.status == "approved"),
-            "viewer": {"name": m.user.name, "role": m.role, "access_level": m.level},
-            "acknowledged": sorted(acks)}
+    pending = (
+        db.query(HandoverVersion)
+        .filter_by(project_id=project_id, status="draft")
+        .filter(HandoverVersion.version > v.version)
+        .first()
+    )
+    return {
+        **version_out(v),
+        "content": content,
+        "diff": filter_diff(v.diff or {}, m.level),
+        "changed_since_approval": flagged,
+        "update_in_review": bool(pending) or (flagged > 0 and v.status == "approved"),
+        "viewer": {"name": m.user.name, "role": m.role, "access_level": m.level},
+        "acknowledged": sorted(acks),
+    }
 
 
 class AckIn(BaseModel):
@@ -92,5 +106,8 @@ def handover_pdf(project_id: str, s=Depends(current_session), db: Session = Depe
     import re
 
     name = re.sub(r"[^A-Za-z0-9]+", "-", data["content"].get("project", "handover"))[:60].strip("-") or "handover"
-    return Response(pdf, media_type="application/pdf",
-                    headers={"Content-Disposition": f'attachment; filename="Handover-{name}-v{data["version"]}.pdf"'})
+    return Response(
+        pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="Handover-{name}-v{data["version"]}.pdf"'},
+    )

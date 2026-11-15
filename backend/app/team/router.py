@@ -5,6 +5,7 @@ The reviewer names the leaver and the new member when creating a project. Each g
 their own account: from then on they sign in themselves, nobody can preview as them, and the audit log records
 their real name. Removing someone ends their access immediately.
 """
+
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -14,7 +15,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..audit.service import log as audit
+from ..auth.router import EMAIL_RE
 from ..auth.security import CAN_MANAGE, current_session, require_member
+from ..config import get_settings
 from ..db import get_db
 from ..models import LABELS, Acknowledgement, Invite, Membership, Project, Question, User
 
@@ -41,9 +44,19 @@ def invite_state(i: Invite) -> str:
 
 
 def _invite_out(i: Invite) -> dict:
-    return {"id": i.id, "user_id": i.user_id, "role": i.role, "access_level": LABELS[i.access_level],
-            "state": invite_state(i), "email_hint": i.email_hint, "created_at": i.created_at.isoformat(),
-            "expires_at": _aware(i.expires_at).isoformat()}
+    from ..notify.email import mask
+
+    return {
+        "id": i.id,
+        "user_id": i.user_id,
+        "role": i.role,
+        "access_level": LABELS[i.access_level],
+        "state": invite_state(i),
+        "email_hint": mask(i.email_hint) if i.email_hint else None,
+        "locked_to_email": bool(i.email_hint),
+        "created_at": i.created_at.isoformat(),
+        "expires_at": _aware(i.expires_at).isoformat(),
+    }
 
 
 def members_out(db: Session, project_id: str, me_id: str | None = None) -> list[dict]:
@@ -53,10 +66,19 @@ def members_out(db: Session, project_id: str, me_id: str | None = None) -> list[
     for m in rows:
         pending = next((i for i in invites if i.user_id == m.user_id and invite_state(i) == "pending"), None)
         joined = bool(m.user.email)
-        out.append({"user_id": m.user_id, "name": m.user.name, "handle": m.user.handle, "role": m.role,
-                    "access_level": LABELS[m.access_level], "joined": joined, "is_you": m.user_id == me_id,
-                    "status": "joined" if joined else ("invited" if pending else "not_invited"),
-                    "invite": _invite_out(pending) if pending else None})
+        out.append(
+            {
+                "user_id": m.user_id,
+                "name": m.user.name,
+                "handle": m.user.handle,
+                "role": m.role,
+                "access_level": LABELS[m.access_level],
+                "joined": joined,
+                "is_you": m.user_id == me_id,
+                "status": "joined" if joined else ("invited" if pending else "not_invited"),
+                "invite": _invite_out(pending) if pending else None,
+            }
+        )
     return out
 
 
@@ -87,15 +109,50 @@ def create_invite(project_id: str, body: InviteIn, s=Depends(current_session), d
         if invite_state(old) == "pending":
             old.revoked_at = now
     token = secrets.token_urlsafe(24)
-    inv = Invite(project_id=project_id, user_id=body.user_id, token_hash=_hash(token), role=target.role,
-                 access_level=target.access_level, email_hint=(body.email or "").strip() or None,
-                 created_by=s.real_user.id, expires_at=now + timedelta(days=INVITE_DAYS))
+    locked = None
+    if body.email and body.email.strip():
+        locked = body.email.strip().lower()
+        if not EMAIL_RE.match(locked):
+            raise HTTPException(422, "Enter a valid email address, or leave it empty to share the link yourself.")
+    inv = Invite(
+        project_id=project_id,
+        user_id=body.user_id,
+        token_hash=_hash(token),
+        role=target.role,
+        access_level=target.access_level,
+        email_hint=locked,
+        created_by=s.real_user.id,
+        expires_at=now + timedelta(days=INVITE_DAYS),
+    )
     db.add(inv)
     db.flush()
-    audit(db, project_id, m.user, "invite.created", "user", body.user_id, name=target.user.name, role=target.role)
+    path = f"/invite/{token}"
+    email_status = None
+    if locked:
+        from ..notify.events import invite as send_invite
+
+        email_status = send_invite(db, m.project, locked, target.user.name, s.real_user.name, path)
+    audit(
+        db,
+        project_id,
+        m.user,
+        "invite.created",
+        "user",
+        body.user_id,
+        name=target.user.name,
+        role=target.role,
+        locked_to_email=bool(locked),
+        email=email_status,
+    )
     db.commit()
-    return {**_invite_out(inv), "token": token, "path": f"/invite/{token}", "name": target.user.name,
-            "project": m.project.name}
+    return {
+        **_invite_out(inv),
+        "token": token,
+        "path": path,
+        "name": target.user.name,
+        "project": m.project.name,
+        "email_status": email_status,
+    }
 
 
 @router.post("/invites/{invite_id}/revoke")
@@ -125,9 +182,18 @@ def preview_invite(token: str, db: Session = Depends(get_db)):
     p = db.get(Project, inv.project_id)
     person = db.get(User, inv.user_id)
     inviter = db.get(User, inv.created_by) if inv.created_by else None
-    return {"state": invite_state(inv), "project": p.name if p else "", "name": person.name if person else "",
-            "role": inv.role, "access_level": LABELS[inv.access_level],
-            "invited_by": inviter.name if inviter else None, "expires_at": _aware(inv.expires_at).isoformat()}
+    from ..notify.email import mask
+
+    return {
+        "state": invite_state(inv),
+        "project": p.name if p else "",
+        "name": person.name if person else "",
+        "for_email": mask(inv.email_hint) if inv.email_hint else None,
+        "role": inv.role,
+        "access_level": LABELS[inv.access_level],
+        "invited_by": inviter.name if inviter else None,
+        "expires_at": _aware(inv.expires_at).isoformat(),
+    }
 
 
 @router.post("/invites/{token}/accept")
@@ -136,12 +202,28 @@ def accept_invite(token: str, s=Depends(current_session), db: Session = Depends(
     inv = _find(db, token)
     state = invite_state(inv)
     if state != "pending":
-        raise HTTPException(409, {"revoked": "This invite was cancelled. Ask the reviewer for a new link.",
-                                  "expired": "This invite has expired. Ask the reviewer for a new link.",
-                                  "accepted": "This invite has already been used."}[state])
+        raise HTTPException(
+            409,
+            {
+                "revoked": "This invite was cancelled. Ask the reviewer for a new link.",
+                "expired": "This invite has expired. Ask the reviewer for a new link.",
+                "accepted": "This invite has already been used.",
+            }[state],
+        )
     if s.via or not s.registered:
         raise HTTPException(401, "Sign in or create an account first, then open the link again.")
     me = s.user
+    if inv.email_hint and inv.email_hint.lower() != (me.email or "").lower():
+        from ..notify.email import mask
+
+        raise HTTPException(
+            403,
+            f"This invite is for {mask(inv.email_hint)}. Sign in with that email address, or ask the reviewer for a new link.",
+        )
+    if inv.email_hint and get_settings().email_configured and not me.email_verified_at:
+        raise HTTPException(
+            403, "Confirm your email address first (check your inbox for the link from Baton), then open this invite again."
+        )
     placeholder = db.get(User, inv.user_id)
     slot = db.query(Membership).filter_by(project_id=inv.project_id, user_id=inv.user_id).first()
     if not slot or not placeholder:
@@ -160,8 +242,7 @@ def accept_invite(token: str, s=Depends(current_session), db: Session = Depends(
     db.query(Question).filter_by(asked_by=placeholder.id).update({"asked_by": me.id})
     placeholder.merged_into = me.id
     inv.accepted_at, inv.accepted_by = datetime.now(timezone.utc), me.id
-    audit(db, inv.project_id, me, "invite.accepted", "user", me.id, name=me.name, as_person=placeholder.name,
-          role=slot.role)
+    audit(db, inv.project_id, me, "invite.accepted", "user", me.id, name=me.name, as_person=placeholder.name, role=slot.role)
     db.commit()
     return {"project_id": inv.project_id, "role": slot.role}
 

@@ -16,6 +16,7 @@ interface InviteInfo {
   role: string;
   access_level: string;
   invited_by: string | null;
+  for_email: string | null;
   expires_at: string;
 }
 
@@ -70,11 +71,18 @@ export default function InvitePage() {
               {i.name}, you're invited to {i.project}
             </h1>
             <p className="mt-1 text-sm text-slate-600">
-              {i.invited_by ? `${i.invited_by} added you` : "You were added"} as <b>{ROLE_LABEL[i.role] ?? i.role}</b>, with access to{" "}
-              <b>{i.access_level}</b> material.{" "}
-              {i.role === "incoming" && "You'll read the approved handover, open the evidence behind each line, and ask Baton questions."}
-              {i.role === "departing" && "You'll answer the questions only you can answer, so the next person isn't left guessing."}
+              {i.invited_by ? `${i.invited_by} added you` : "You were added"} as <b>{ROLE_LABEL[i.role] ?? i.role}</b>, with
+              access to <b>{i.access_level}</b> material.{" "}
+              {i.role === "incoming" &&
+                "You'll read the approved handover, open the evidence behind each line, and ask Baton questions."}
+              {i.role === "departing" &&
+                "You'll answer the questions only you can answer, so the next person isn't left guessing."}
             </p>
+            {i.for_email && (
+              <p className="mt-2 text-sm text-slate-600">
+                This invite is for <b>{i.for_email}</b>: sign in or create your account with that address.
+              </p>
+            )}
             {i.state !== "pending" ? (
               <div className="mt-4">
                 <Notice tone="warn">{STATE_MSG[i.state]}</Notice>

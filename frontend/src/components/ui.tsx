@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2, Loader2, ShieldCheck, ShieldQuestion, X } from "lucide-react";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
 import { useEffect } from "react";
 import type { Confidence } from "../lib/types";
 
@@ -41,8 +41,12 @@ export function Button({
   );
 }
 
-export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cx("rounded-xl border border-slate-200 bg-white shadow-sm", className)}>{children}</div>;
+export function Card({ children, className, ...rest }: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div {...rest} className={cx("rounded-xl border border-slate-200 bg-white shadow-sm", className)}>
+      {children}
+    </div>
+  );
 }
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
@@ -100,26 +104,66 @@ export function Empty({ icon, title, children }: { icon?: ReactNode; title: stri
 
 export function Pill({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <span className={cx("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap", className)}>
+    <span
+      className={cx("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap", className)}
+    >
       {children}
     </span>
   );
 }
 
-const CONF: Record<Confidence, { label: string; cls: string; hint: string }> = {
-  verified: { label: "Verified", cls: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200", hint: "Quote found and it supports the claim" },
-  corroborated: { label: "Corroborated", cls: "bg-emerald-600 text-white", hint: "Supported by two or more independent sources" },
-  weak: { label: "Weak", cls: "bg-amber-50 text-amber-800 ring-1 ring-amber-200", hint: "Quote only partly supports the claim" },
-  conflicting: { label: "Conflicting", cls: "bg-orange-100 text-orange-800 ring-1 ring-orange-200", hint: "Another source says something different" },
-  unverified: { label: "Unverified", cls: "bg-rose-50 text-rose-700 ring-1 ring-rose-200", hint: "Failed the quote or support check" },
-  leaver_attested: { label: "Leaver-attested", cls: "bg-violet-50 text-violet-700 ring-1 ring-violet-200", hint: "From the departing member's interview answer" },
-  reviewer_asserted: { label: "Reviewer-asserted", cls: "bg-sky-50 text-sky-700 ring-1 ring-sky-200", hint: "Added or changed by the reviewer beyond the evidence" },
-  unknown: { label: "Unknown", cls: "bg-slate-100 text-slate-600 ring-1 ring-slate-200", hint: "Not found in authorised sources" },
+// Plain-language labels. The internal names (verified, corroborated...) stay in the API and the docs.
+export const CONF: Record<Confidence, { label: string; cls: string; hint: string }> = {
+  verified: {
+    label: "Backed by source",
+    cls: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
+    hint: "The quote is in the file, word for word, and it backs this statement",
+  },
+  corroborated: {
+    label: "Backed by 2+ sources",
+    cls: "bg-emerald-600 text-white",
+    hint: "Two or more different files back this statement",
+  },
+  weak: {
+    label: "Partly backed",
+    cls: "bg-amber-50 text-amber-800 ring-1 ring-amber-200",
+    hint: "The quote backs only part of the statement, or comes from text that looks aimed at an AI",
+  },
+  conflicting: {
+    label: "Sources disagree",
+    cls: "bg-orange-100 text-orange-800 ring-1 ring-orange-200",
+    hint: "Another file says something different; a reviewer must decide",
+  },
+  unverified: {
+    label: "Not backed",
+    cls: "bg-rose-50 text-rose-700 ring-1 ring-rose-200",
+    hint: "The quote isn't in the file, or doesn't back the statement. Kept out of the handover.",
+  },
+  leaver_attested: {
+    label: "Confirmed by the leaver",
+    cls: "bg-violet-50 text-violet-700 ring-1 ring-violet-200",
+    hint: "From the departing person's own answer",
+  },
+  reviewer_asserted: {
+    label: "Reviewer's decision",
+    cls: "bg-sky-50 text-sky-700 ring-1 ring-sky-200",
+    hint: "Approved by the reviewer without full backing from the files, with a reason",
+  },
+  unknown: {
+    label: "Unknown",
+    cls: "bg-slate-100 text-slate-600 ring-1 ring-slate-200",
+    hint: "Not found in sources you can see",
+  },
 };
 
 export function ConfidenceBadge({ value }: { value: Confidence }) {
   const c = CONF[value] ?? CONF.unknown;
-  const Icon = value === "verified" || value === "corroborated" ? ShieldCheck : value === "unverified" || value === "unknown" ? ShieldQuestion : null;
+  const Icon =
+    value === "verified" || value === "corroborated"
+      ? ShieldCheck
+      : value === "unverified" || value === "unknown"
+        ? ShieldQuestion
+        : null;
   return (
     <Pill className={c.cls}>
       <span title={c.hint} className="inline-flex items-center gap-1">
@@ -144,7 +188,19 @@ export function TypeBadge({ type }: { type: string }) {
   return <Pill className="bg-slate-100 text-slate-700 capitalize">{type.replace(/_/g, " ")}</Pill>;
 }
 
-export function Modal({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean }) {
+export function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  wide,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: ReactNode;
+  wide?: boolean;
+}) {
   useEffect(() => {
     if (!open) return;
     const h = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -153,7 +209,10 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:p-10" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:p-10"
+      onClick={onClose}
+    >
       <div
         className={cx("fade-in w-full rounded-xl bg-white shadow-xl", wide ? "max-w-4xl" : "max-w-lg")}
         onClick={(e) => e.stopPropagation()}
@@ -172,7 +231,17 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
   );
 }
 
-export function Drawer({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
+export function Drawer({
+  open,
+  onClose,
+  title,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: ReactNode;
+}) {
   useEffect(() => {
     if (!open) return;
     const h = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -212,7 +281,8 @@ export function Highlighted({ text, start, end }: { text: string; start: number 
 }
 
 export function Stat({ label, value, tone }: { label: string; value: number | string; tone?: "ok" | "warn" | "bad" }) {
-  const c = tone === "ok" ? "text-emerald-600" : tone === "warn" ? "text-amber-600" : tone === "bad" ? "text-rose-600" : "text-slate-900";
+  const c =
+    tone === "ok" ? "text-emerald-600" : tone === "warn" ? "text-amber-600" : tone === "bad" ? "text-rose-600" : "text-slate-900";
   return (
     <Card className="p-4">
       <div className={cx("text-2xl font-semibold", c)}>{value}</div>

@@ -15,9 +15,9 @@ Before you start:
 
 ---
 
-## Step 0: Save the worked example's AI answers (recommended)
+## Step 0: Save the demo's AI answers (recommended)
 
-This lets every judge open the worked example instantly, even if Gemini is busy. On your PC, after the example has been
+This lets every judge open the demo instantly, even if Gemini is busy. On your PC, after the example has been
 analysed at least once:
 
 ```powershell
@@ -26,7 +26,7 @@ cd $HOME\Documents\baton\backend
 python scripts\export_demo_cache.py
 cd ..
 git add .
-git commit -m "Saved AI answers for the worked example"
+git commit -m "Saved AI answers for the demo"
 git push
 ```
 
@@ -66,10 +66,11 @@ It should print `Saved N cached Gemini responses`.
    | `DATABASE_URL` | your Supabase line from Step 1 |
    | `GEMINI_API_KEY` | your Gemini key |
    | `CORS_ORIGINS` | `http://localhost:5173` for now (you'll change it in Step 4) |
-   | `SUPABASE_URL` | leave empty |
-   | `SUPABASE_SERVICE_ROLE_KEY` | leave empty |
+   | `RESEND_API_KEY` | optional: leave empty, or see "Email" below |
+   | `EMAIL_FROM` | optional: leave empty, or see "Email" below |
 
-   `APP_SECRET`, `GEMINI_MODEL` and `BACKUP_AI_PROVIDER` are filled in automatically.
+   `APP_SECRET`, `GEMINI_MODEL`, `BACKUP_AI_PROVIDER`, `APP_URL` and `BATON_RUN_WORKER` are filled in automatically.
+   `APP_SECRET` must stay long and random: the API refuses to start on Render without it.
 4. Click **Apply** and wait 5–10 minutes for the build. When it says **Live**, copy the service address, for example
    `https://baton-api-xxxx.onrender.com`.
 5. Test it: open `https://baton-api-xxxx.onrender.com/health` in the browser. You should see:
@@ -98,7 +99,9 @@ If you change `VITE_API_URL` later, redeploy: **Deployments → ⋯ → Redeploy
 ## Step 4: Connect the two
 
 1. In Render, open **baton-api → Environment**.
-2. Change `CORS_ORIGINS` to your Vercel link, for example `https://baton-xyz.vercel.app`, with no `/` at the end.
+2. Change `CORS_ORIGINS` to your Vercel link, for example `https://baton-xyz.vercel.app`, with no `/` at the end. It must
+   match **exactly**: only the addresses listed here may call the API (there is no wildcard).
+   Also set `APP_URL` to the same link (it's used for links inside emails).
 3. Click **Save Changes**. Render restarts the backend by itself in about 1 minute.
 
 ---
@@ -122,16 +125,34 @@ To stop judges waiting:
 Open your Vercel link in an **Incognito / Private window**, so you're a brand-new visitor.
 
 - [ ] The home page loads, with no red "Can't reach the Baton server" message
-- [ ] **See how it works → Open the example** opens EventApp, and the analysis finishes
+- [ ] **Try the demo** opens your private copy of EventApp, already handed over
 - [ ] **Try it with your project**: fill in the form, download the sample project, upload a few files, and run the analysis
 - [ ] The pop-up guide appears and points at the right button at each step
 - [ ] Resolve conflicts → approve claims → **Generate handover → Approve & share**
 - [ ] Switch **Viewing as** to the person taking over: the handover shows, and lines open their evidence
+- [ ] A demo sign-in in a second (private) window opens a *different* copy
 - [ ] Try it on your phone too
 
 Then paste the real links into `README.md`, replacing `<your Vercel URL>` and `<your Render URL>`, and push.
 
 ---
+
+## Email (optional)
+
+Without email, everything works and invite links are copied by hand. To send invites, "new handover version" notices
+and password-reset links:
+
+1. Create a free account at https://resend.com, add and verify a domain you own (Resend shows the DNS records).
+2. Create an API key.
+3. On Render → **baton-api → Environment**, set `RESEND_API_KEY` to the key and `EMAIL_FROM` to a sender on that domain,
+   for example `Baton <handover@yourdomain.com>`. Save.
+4. `/health` now shows `"email": true`. Every attempt is logged in the `email_log` table with its real outcome.
+
+## Upgrading an existing deployment
+
+The database is upgraded automatically at start-up (Alembic migrations in `backend/migrations`), including databases
+created by earlier versions; nothing needs to be run by hand. Check the Render log for
+`Running upgrade 0001 -> 0002` the first time, then `Baton API ready`.
 
 ## Updating after deployment
 
@@ -148,7 +169,8 @@ git push
 
 | What you see | Fix |
 | --- | --- |
-| Home page: "Can't reach the Baton server" | Render is waking up (wait 1 minute), or `VITE_API_URL` is wrong. Check it in Vercel, then redeploy |
+| Home page: "Can't reach the Baton server" | Render is waking up (wait 1 minute), or `VITE_API_URL` is wrong. Check it in Vercel, then redeploy. Also check `CORS_ORIGINS` on Render is exactly your Vercel link |
+| Render log: `APP_SECRET must be set` | Set `APP_SECRET` to a long random value (Environment → Generate) |
 | Browser console shows a CORS error | `CORS_ORIGINS` on Render must be exactly your Vercel link, with `https://` and no `/` at the end |
 | Render log: `password authentication failed` | Wrong password in `DATABASE_URL`. Reset it in Supabase (Project Settings → Database) and update Render |
 | Render log: `could not translate host name` | You copied the *Direct* connection. Use **Session pooler** |

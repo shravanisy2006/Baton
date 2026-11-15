@@ -1,4 +1,5 @@
 """Gaps, conflicts and the departure interview."""
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -6,8 +7,8 @@ from sqlalchemy.orm import Session
 from ..audit.service import log as audit
 from ..auth.security import CAN_REVIEW, CAN_SEE_WORKING, current_session, require_member
 from ..db import get_db
-from ..ingest.service import next_seq, _hash
 from ..ingest.redact import redact
+from ..ingest.service import _hash, next_seq
 from ..models import Claim, Conflict, EvidenceUnit, Gap, Source
 from ..serialize import claim_out, conflict_out, gap_out
 from ..verify.service import refresh_confidence
@@ -21,8 +22,10 @@ def list_gaps(project_id: str, s=Depends(current_session), db: Session = Depends
     rows = db.query(Gap).filter(Gap.project_id == project_id, Gap.access_label <= m.level).all()
     order = {"open": 0, "answered": 1, "dismissed": 2}
     rows.sort(key=lambda g: order.get(g.status, 3))
-    return {"gaps": [gap_out(g) for g in rows],
-            "hidden_count": db.query(Gap).filter(Gap.project_id == project_id, Gap.access_label > m.level).count()}
+    return {
+        "gaps": [gap_out(g) for g in rows],
+        "hidden_count": db.query(Gap).filter(Gap.project_id == project_id, Gap.access_label > m.level).count(),
+    }
 
 
 class AnswerIn(BaseModel):
@@ -32,8 +35,13 @@ class AnswerIn(BaseModel):
 def _attestation_source(db: Session, project_id: str, level: int, name: str) -> Source:
     src = db.query(Source).filter_by(project_id=project_id, kind="attestation", access_label=level).first()
     if not src:
-        src = Source(project_id=project_id, kind="attestation", filename=f"Departure interview — {name}",
-                     access_label=level, status="parsed")
+        src = Source(
+            project_id=project_id,
+            kind="attestation",
+            filename=f"Departure interview — {name}",
+            access_label=level,
+            status="parsed",
+        )
         db.add(src)
         db.flush()
     return src
@@ -57,9 +65,18 @@ def answer_gap(gap_id: str, body: AnswerIn, s=Depends(current_session), db: Sess
     author = f"{s.via.name} (for {m.user.name})" if s.via else m.user.name
     src = _attestation_source(db, g.project_id, g.access_label, m.user.name)
     seq = next_seq(db, g.project_id)
-    unit = EvidenceUnit(project_id=g.project_id, source_id=src.id, code=f"E-{seq}", seq=seq, kind="attestation",
-                        text=text, text_hash=_hash(text), author=author, access_label=g.access_label,
-                        location={"gap_id": g.id, "question": g.question})
+    unit = EvidenceUnit(
+        project_id=g.project_id,
+        source_id=src.id,
+        code=f"E-{seq}",
+        seq=seq,
+        kind="attestation",
+        text=text,
+        text_hash=_hash(text),
+        author=author,
+        access_label=g.access_label,
+        location={"gap_id": g.id, "question": g.question},
+    )
     db.add(unit)
     db.flush()
     src.unit_count += 1
@@ -82,10 +99,24 @@ def answer_gap(gap_id: str, body: AnswerIn, s=Depends(current_session), db: Sess
         q = db.query(Question).filter_by(gap_id=g.id).first()
         if q:
             q.status, q.person_answer, q.person_answer_by = "answered_by_person", text, author
-            q.citations = list(q.citations or []) + [{
-                "evidence_id": unit.id, "code": unit.code, "quote": text, "source": src.filename,
-                "author": author, "date": None, "start": 0, "end": len(text), "text": text, "match": "exact",
-                "kind": "attestation"}]
+            from ..notify.events import question_answered
+
+            question_answered(db, m.project, q.asked_by, author)
+            q.citations = list(q.citations or []) + [
+                {
+                    "evidence_id": unit.id,
+                    "code": unit.code,
+                    "quote": text,
+                    "source": src.filename,
+                    "author": author,
+                    "date": None,
+                    "start": 0,
+                    "end": len(text),
+                    "text": text,
+                    "match": "exact",
+                    "kind": "attestation",
+                }
+            ]
     audit(db, g.project_id, m.user, "gap.answered", "gap", g.id, evidence=unit.code)
     db.commit()
     return gap_out(g)
@@ -118,6 +149,7 @@ def _sides(db: Session, k: Conflict, level: int) -> tuple[list[dict], list[dict]
             if c and c.access_label <= level:
                 out.append(claim_out(c, level, detail=True))
         return out
+
     return load(k.side_a or [k.claim_a_id]), load(k.side_b or [k.claim_b_id])
 
 
@@ -162,7 +194,7 @@ def resolve_conflict(conflict_id: str, body: ResolveIn, s=Depends(current_sessio
             if c:
                 c.review_state = "superseded"
                 c.reviewer_note = f"Superseded when resolving a conflict. {note}".strip()
-        for cid in (side_a if losers is side_b else side_b):
+        for cid in side_a if losers is side_b else side_b:
             c = db.get(Claim, cid)
             if c and c.changed_note:
                 c.changed_note = None  # the reviewer checked the newer evidence: this line still stands
@@ -177,7 +209,17 @@ def resolve_conflict(conflict_id: str, body: ResolveIn, s=Depends(current_sessio
             refresh_confidence(db, c)
     for g in db.query(Gap).filter_by(conflict_id=k.id, status="open"):
         g.status, g.answer = "dismissed", "Resolved by reviewer."
-    audit(db, k.project_id, m.user, "conflict.resolved", "conflict", k.id, keep_both=body.keep_both,
-          winner=body.winner_claim_id, note=note, kind=k.kind)
+    audit(
+        db,
+        k.project_id,
+        m.user,
+        "conflict.resolved",
+        "conflict",
+        k.id,
+        keep_both=body.keep_both,
+        winner=body.winner_claim_id,
+        note=note,
+        kind=k.kind,
+    )
     db.commit()
     return conflict_out(k, *_sides(db, k, m.level))

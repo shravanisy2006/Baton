@@ -6,8 +6,10 @@ interface SessionCtx {
   me: Me | null;
   loading: boolean;
   refresh: () => Promise<Me | null>;
-  startDemo: () => Promise<string>;
-  startGuest: () => Promise<void>;
+  startDemo: (role?: "reviewer" | "departing" | "incoming") => Promise<string>;
+  restartDemo: () => Promise<string>;
+  demoSignIn: (email: string, password: string) => Promise<string | null>;
+  signOutEverywhere: () => Promise<void>;
   switchTo: (userId: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
@@ -43,18 +45,40 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     refresh();
   }, [refresh]);
 
-  const startDemo = useCallback(async () => {
-    const r = await api.post<{ token: string; project_id: string }>("/auth/demo");
+  // Every demo visitor gets a private copy (analysed, reviewed, version 1 approved), deleted after 24 hours.
+  const startDemo = useCallback(
+    async (role: "reviewer" | "departing" | "incoming" = "reviewer") => {
+      const r = await api.post<{ token: string; project_id: string }>("/auth/demo", { role, stage: "handed_over" });
+      setToken(r.token);
+      await refresh();
+      return r.project_id;
+    },
+    [refresh],
+  );
+
+  const restartDemo = useCallback(async () => {
+    const r = await api.post<{ token: string; project_id: string }>("/auth/demo/restart");
     setToken(r.token);
     await refresh();
     return r.project_id;
   }, [refresh]);
 
-  const startGuest = useCallback(async () => {
-    const r = await api.post<{ token: string }>("/auth/guest");
-    setToken(r.token);
-    await refresh();
-  }, [refresh]);
+  // Demo sign-ins: in a browser that already has a demo copy, this switches person inside it.
+  const demoSignIn = useCallback(
+    async (email: string, password: string) => {
+      const r = await api.post<{ token: string; project_id?: string }>("/auth/signin", { email, password });
+      setToken(r.token);
+      const m = await refresh();
+      return r.project_id ?? m?.projects[0]?.id ?? null;
+    },
+    [refresh],
+  );
+
+  const signOutEverywhere = useCallback(async () => {
+    await api.post("/auth/signout-everywhere");
+    setToken(null);
+    setMe(null);
+  }, []);
 
   const switchTo = useCallback(
     async (userId: string) => {
@@ -89,7 +113,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <Ctx.Provider value={{ me, loading, refresh, startDemo, startGuest, switchTo, signIn, signUp, signOut }}>
+    <Ctx.Provider
+      value={{ me, loading, refresh, startDemo, restartDemo, demoSignIn, signOutEverywhere, switchTo, signIn, signUp, signOut }}
+    >
       {children}
     </Ctx.Provider>
   );

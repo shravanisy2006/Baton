@@ -1,11 +1,25 @@
-import { FileUp, Github, Lock, Play, Upload } from "lucide-react";
+import { FileUp, Github, Lock, Play, ShieldAlert, Trash2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, API_URL } from "../lib/api";
 import { useApi } from "../lib/hooks";
 import { useProject } from "../lib/session";
 import type { Source } from "../lib/types";
-import { Button, Card, cx, Empty, ErrorBox, input, LabelBadge, Notice, PageHeader, Pill, select, Spinner } from "../components/ui";
+import {
+  Button,
+  Card,
+  cx,
+  Empty,
+  ErrorBox,
+  input,
+  LabelBadge,
+  Modal,
+  Notice,
+  PageHeader,
+  Pill,
+  select,
+  Spinner,
+} from "../components/ui";
 
 const STATUS: Record<string, string> = {
   parsed: "bg-emerald-50 text-emerald-700",
@@ -21,18 +35,37 @@ export default function SourcesPage() {
     () => api.get<{ sources: Source[]; hidden_count: number }>(`/projects/${pid}/sources`),
     [pid],
   );
+  const [deleting, setDeleting] = useState<Source | null>(null);
 
   return (
     <div>
       <PageHeader
         title="Sources"
-        subtitle="Authorised project material. Every source carries an access label, and everything taken from it inherits that label."
+        subtitle="The project's files. Each one has an access label, and everything Baton finds in it keeps that label."
       />
+      <details className="mb-5 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-600">
+        <summary className="cursor-pointer font-medium text-slate-800">
+          What happens to uploaded files, and what the AI sees
+        </summary>
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          <li>
+            Baton keeps only the text, after removing secrets (API keys, passwords, tokens) and phone numbers. The original file
+            isn't stored.
+          </li>
+          <li>That text is sent to Google Gemini to find decisions, owners and tasks, including files marked Restricted.</li>
+          <li>Photos and scanned pages are sent to Gemini as images to be read, so text in an image can't be redacted first.</li>
+          <li>Deleting a file removes its evidence and its quotes everywhere, including approved handovers and answers.</li>
+        </ul>
+      </details>
       {canManage && !o.project.is_demo && !o.counts.claims && <GettingStarted hasSources={!!data?.sources.length} />}
       {canManage && <UploadPanel onDone={() => (reload(true), reloadOverview())} />}
       {loading && <Spinner />}
       {error && <ErrorBox message={error.message} onRetry={reload} />}
-      {data && data.sources.length === 0 && <Empty icon={<FileUp className="h-8 w-8" />} title="No sources yet">Upload files or import a GitHub repository above.</Empty>}
+      {data && data.sources.length === 0 && (
+        <Empty icon={<FileUp className="h-8 w-8" />} title="No sources yet">
+          Upload files or import a GitHub repository above.
+        </Empty>
+      )}
       {data && data.sources.length > 0 && (
         <Card className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -43,6 +76,7 @@ export default function SourcesPage() {
                 <th className="px-4 py-2.5">Status</th>
                 <th className="px-4 py-2.5 text-right">Evidence pieces</th>
                 <th className="px-4 py-2.5 text-right">Redactions</th>
+                {canManage && <th className="px-4 py-2.5" aria-label="Actions" />}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -51,7 +85,11 @@ export default function SourcesPage() {
                   <td className="px-4 py-3">
                     <div className="font-medium text-slate-800">{s.filename}</div>
                     <div className="text-xs text-slate-500">
-                      {s.kind === "attestation" ? "Departure interview answers" : s.kind === "chat" ? "CHAT EXPORT" : s.kind.toUpperCase()}
+                      {s.kind === "attestation"
+                        ? "Departure interview answers"
+                        : s.kind === "chat"
+                          ? "CHAT EXPORT"
+                          : s.kind.toUpperCase()}
                       {s.uri && (
                         <>
                           {" · "}
@@ -64,8 +102,15 @@ export default function SourcesPage() {
                     {s.error && <div className="mt-1 text-xs text-rose-700">{s.error}</div>}
                     {!!s.coverage?.ocr_pages && (
                       <div className="mt-1 text-xs text-sky-700">
-                        Scanned: {s.coverage.ocr_pages} page{s.coverage.ocr_pages === 1 ? "" : "s"} transcribed by AI. Quotes are checked
-                        against the transcription; compare with the original for important lines.
+                        Scanned: {s.coverage.ocr_pages} page{s.coverage.ocr_pages === 1 ? "" : "s"} transcribed by AI. Quotes are
+                        checked against the transcription; compare with the original for important lines.
+                      </div>
+                    )}
+                    {!!s.coverage?.flagged_instructions && (
+                      <div className="mt-1 flex items-start gap-1 text-xs text-amber-800">
+                        <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        {s.coverage.flagged_instructions} piece(s) look like instructions written to an AI. Baton won't follow
+                        them, and nothing based only on them is marked as backed.
                       </div>
                     )}
                     {!!s.coverage?.skipped_count && (
@@ -82,6 +127,20 @@ export default function SourcesPage() {
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">{s.unit_count}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{s.redactions}</td>
+                  {canManage && (
+                    <td className="px-4 py-3 text-right">
+                      {s.kind !== "attestation" && (
+                        <button
+                          className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-700"
+                          onClick={() => setDeleting(s)}
+                          aria-label={`Delete ${s.filename}`}
+                          title="Delete this file and its evidence"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -93,7 +152,71 @@ export default function SourcesPage() {
           )}
         </Card>
       )}
+      {deleting && (
+        <DeleteSource
+          source={deleting}
+          onClose={() => setDeleting(null)}
+          onDone={() => (setDeleting(null), reload(true), reloadOverview())}
+        />
+      )}
     </div>
+  );
+}
+
+function DeleteSource({ source, onClose, onDone }: { source: Source; onClose: () => void; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [result, setResult] = useState<{ evidence_removed: number; claims_removed: number; claims_to_recheck: number } | null>(
+    null,
+  );
+  async function del() {
+    setBusy(true);
+    setErr(null);
+    try {
+      setResult(await api.post(`/sources/${source.id}/delete`));
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Modal open onClose={result ? onDone : onClose} title={result ? "File deleted" : `Delete ${source.filename}?`}>
+      {result ? (
+        <>
+          <p className="text-sm text-slate-700">
+            Removed {result.evidence_removed} piece(s) of evidence and {result.claims_removed} finding(s) that relied only on this
+            file. Its quotes were also removed from stored handovers and answers.
+            {result.claims_to_recheck > 0 &&
+              ` ${result.claims_to_recheck} finding(s) also cited other files and need checking again.`}
+          </p>
+          <div className="mt-4 flex justify-end">
+            <Button onClick={onDone}>Done</Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-slate-600">
+            Its evidence is deleted, findings that relied only on it are removed, and its quotes are taken out of every handover
+            version and Ask Baton answer. Approved lines that also cited it are marked "Changed since approval". This can't be
+            undone.
+          </p>
+          {err && (
+            <div className="mt-3">
+              <ErrorBox message={err} />
+            </div>
+          )}
+          <div className="mt-4 flex justify-end gap-2">
+            <Button variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={del} loading={busy}>
+              <Trash2 className="h-4 w-4" /> Delete file
+            </Button>
+          </div>
+        </>
+      )}
+    </Modal>
   );
 }
 
@@ -142,7 +265,11 @@ function UploadPanel({ onDone }: { onDone: () => void }) {
     setGhBusy(true);
     setGhMsg(null);
     try {
-      const s = await api.post<Source>(`/projects/${pid}/sources/github`, { repo_url: repo, access_label: ghLabel, token: token || null });
+      const s = await api.post<Source>(`/projects/${pid}/sources/github`, {
+        repo_url: repo,
+        access_label: ghLabel,
+        token: token || null,
+      });
       setGhMsg({ ok: true, text: `Imported ${s.unit_count} evidence pieces from ${s.filename.replace("GitHub · ", "")}.` });
       setRepo("");
       setToken("");
@@ -179,7 +306,10 @@ function UploadPanel({ onDone }: { onDone: () => void }) {
           {files.length ? (
             <span className="font-medium text-slate-700">{files.map((f) => f.name).join(", ")}</span>
           ) : (
-            <span className="text-slate-500">Drop files here or click to choose · PDF (scanned too), DOCX, TXT, MD, CSV, JSON · chat exports (WhatsApp/Slack/Discord) · photos and screenshots (PNG, JPG) · max 10 MB each</span>
+            <span className="text-slate-500">
+              Drop files here or click to choose · PDF (scanned too), DOCX, TXT, MD, CSV, JSON · chat exports
+              (WhatsApp/Slack/Discord) · photos and screenshots (PNG, JPG) · max 10 MB each
+            </span>
           )}
           <input
             ref={fileRef}
@@ -228,8 +358,21 @@ function UploadPanel({ onDone }: { onDone: () => void }) {
           token. A token is used once and never stored.
         </p>
         <form onSubmit={importRepo} className="mt-3 space-y-2">
-          <input className={input} placeholder="https://github.com/owner/repo" value={repo} onChange={(e) => setRepo(e.target.value)} required />
-          <input className={input} placeholder="Read-only token (optional, for private repos)" type="password" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" />
+          <input
+            className={input}
+            placeholder="https://github.com/owner/repo"
+            value={repo}
+            onChange={(e) => setRepo(e.target.value)}
+            required
+          />
+          <input
+            className={input}
+            placeholder="Read-only token (optional, for private repos)"
+            type="password"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            autoComplete="off"
+          />
           <div className="flex gap-2">
             <select className={select} value={ghLabel} onChange={(e) => setGhLabel(e.target.value)} aria-label="Access label">
               <option>Team</option>
@@ -242,9 +385,7 @@ function UploadPanel({ onDone }: { onDone: () => void }) {
           </div>
         </form>
         {ghMsg && (
-          <div className="mt-3">
-            {ghMsg.ok ? <Notice tone="ok">{ghMsg.text}</Notice> : <ErrorBox message={ghMsg.text} />}
-          </div>
+          <div className="mt-3">{ghMsg.ok ? <Notice tone="ok">{ghMsg.text}</Notice> : <ErrorBox message={ghMsg.text} />}</div>
         )}
       </Card>
     </div>
@@ -280,10 +421,13 @@ function GettingStarted({ hasSources }: { hasSources: boolean }) {
           Discord .json), or import a GitHub repo.
         </li>
         <li>
-          Give each upload an access label. <b>Team</b>: everyone. <b>Leads</b>: leads and above. <b>Restricted</b>: reviewer only.
+          Give each upload an access label. <b>Team</b>: everyone. <b>Leads</b>: leads and above. <b>Restricted</b>: reviewer
+          only.
           {o.project.incoming && <> {o.project.incoming} will only ever see what their level allows.</>}
         </li>
-        <li>Run the analysis. Baton extracts claims, checks every quote, and flags gaps and conflicts for you to review.</li>
+        <li>
+          Run the analysis. Baton lists what it finds, checks every quote, and flags gaps and disagreements for you to review.
+        </li>
       </ol>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <Button onClick={analyse} loading={busy} disabled={!hasSources} data-guide="run-analysis">

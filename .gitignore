@@ -22,3 +22,9 @@ Thumbs.db
 
 # build caches
 *.tsbuildinfo
+
+# test output
+frontend/test-results/
+frontend/playwright-report/
+backend/dev-fake.db
+backend/.coverage

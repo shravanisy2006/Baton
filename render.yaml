@@ -24,7 +24,11 @@ services:
         value: gemini:gemini-3.5-flash-lite
       - key: CORS_ORIGINS
         sync: false
-      - key: SUPABASE_URL
+      - key: APP_URL
+        value: https://baton-weld.vercel.app
+      - key: RESEND_API_KEY
         sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
+      - key: EMAIL_FROM
         sync: false
+      - key: BATON_RUN_WORKER
+        value: "1"

@@ -62,9 +62,11 @@ export default function Projects() {
             <Logo />
           </Link>
           <div className="flex items-center gap-3">
-            <Button variant="secondary" onClick={async () => nav(`/p/${await startDemo()}`)}>
-              <Sparkles className="h-4 w-4" /> <span className="hidden sm:inline">Open the</span> worked example
-            </Button>
+            {!me?.registered && (
+              <Button variant="secondary" onClick={async () => nav(`/p/${await startDemo()}`)}>
+                <Sparkles className="h-4 w-4" /> <span className="hidden sm:inline">Open the</span> demo
+              </Button>
+            )}
             <AccountMenu />
           </div>
         </div>
@@ -87,7 +89,7 @@ export default function Projects() {
                 <Card className="p-4 transition hover:border-brand-500/40 hover:shadow">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-slate-900">{p.name}</span>
-                    {p.is_demo && <Pill className="bg-amber-100 text-amber-800">Synthetic demo</Pill>}
+                    {p.is_demo && <Pill className="bg-amber-100 text-amber-800">Demo copy</Pill>}
                     <span className="ml-auto text-xs text-slate-500">{ROLE_LABEL[p.role] ?? p.role}</span>
                   </div>
                   {p.description && <p className="mt-1 line-clamp-2 text-sm text-slate-500">{p.description}</p>}
@@ -97,32 +99,48 @@ export default function Projects() {
           </div>
         </section>
         {me?.registered ? (
-        <Card className="h-fit p-5">
-          <h2 className="font-semibold text-slate-900">Hand over your own project</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Tell Baton who is leaving and who is taking over. Next you'll upload the project's files.
-          </p>
-          <form onSubmit={create} className="mt-4 space-y-4">
-            <Field label="Project">
-              <input className={input} placeholder="Project name, e.g. Library app" value={name} onChange={(e) => setName(e.target.value)} required minLength={2} />
-              <textarea className={input} placeholder="What is this project? (optional)" rows={2} value={desc} onChange={(e) => setDesc(e.target.value)} />
-            </Field>
-            <p className="text-xs text-slate-500">
-              You ({me?.real_user?.name}) are the reviewer who approves the handover. You can invite both people once the
-              project exists.
+          <Card className="h-fit p-5">
+            <h2 className="font-semibold text-slate-900">Hand over your own project</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Tell Baton who is leaving and who is taking over. Next you'll upload the project's files.
             </p>
-            <PersonFields title="Who is leaving?" v={leaver} set={setLeaver} />
-            <PersonFields title="Who is taking over?" v={joiner} set={setJoiner} />
-            {err && <ErrorBox message={err} />}
-            <Button type="submit" loading={busy} className="w-full">
-              Create and add files
-            </Button>
-            <p className="text-xs text-slate-500">
-              No project files to hand? <a className="text-brand-600 hover:underline" href={`${API_URL}/samples.zip`}>Download a sample project</a>{" "}
-              (synthetic) and upload it here.
-            </p>
-          </form>
-        </Card>
+            <form onSubmit={create} className="mt-4 space-y-4">
+              <Field label="Project">
+                <input
+                  className={input}
+                  placeholder="Project name, e.g. Library app"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  minLength={2}
+                />
+                <textarea
+                  className={input}
+                  placeholder="What is this project? (optional)"
+                  rows={2}
+                  value={desc}
+                  onChange={(e) => setDesc(e.target.value)}
+                />
+              </Field>
+              <p className="text-xs text-slate-500">
+                You ({me?.real_user?.name}) are the reviewer who approves the handover. You can invite both people once the
+                project exists.
+              </p>
+              <PersonFields title="Who is leaving?" v={leaver} set={setLeaver} />
+              <PersonFields title="Who is taking over?" v={joiner} set={setJoiner} />
+              {err && <ErrorBox message={err} />}
+              <Button type="submit" loading={busy} className="w-full">
+                Create and add files
+              </Button>
+              <p className="text-xs text-slate-500">
+                No project files to hand?{" "}
+                <a className="text-brand-600 hover:underline" href={`${API_URL}/samples.zip`}>
+                  Download a sample project
+                </a>{" "}
+                (synthetic) and upload it here.
+              </p>
+            </form>
+          </Card>
         ) : (
           <Card className="h-fit p-5">
             <h2 className="font-semibold text-slate-900">Hand over your own project</h2>
@@ -152,7 +170,13 @@ type Person = { name: string; handle: string; access_level: string };
 function PersonFields({ title, v, set }: { title: string; v: Person; set: (p: Person) => void }) {
   return (
     <Field label={title}>
-      <input className={input} placeholder="Full name" value={v.name} onChange={(e) => set({ ...v, name: e.target.value })} required />
+      <input
+        className={input}
+        placeholder="Full name"
+        value={v.name}
+        onChange={(e) => set({ ...v, name: e.target.value })}
+        required
+      />
       <input
         className={input}
         placeholder="Username in the files, e.g. GitHub handle (optional)"
@@ -161,7 +185,11 @@ function PersonFields({ title, v, set }: { title: string; v: Person; set: (p: Pe
       />
       <label className="flex items-center gap-2 text-xs text-slate-500">
         Can see
-        <select className={select + " py-1 text-xs"} value={v.access_level} onChange={(e) => set({ ...v, access_level: e.target.value })}>
+        <select
+          className={select + " py-1 text-xs"}
+          value={v.access_level}
+          onChange={(e) => set({ ...v, access_level: e.target.value })}
+        >
           <option value="Team">Team files only</option>
           <option value="Leads">Team + Leads files</option>
           <option value="Restricted">Everything</option>

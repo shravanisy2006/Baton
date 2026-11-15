@@ -7,6 +7,7 @@ where, so the reviewer can see what the AI altered.
 Gate 2 (claim support) is a separate AI call that sees only the claim and its quotes.
 Confidence labels come from both gates. The AI can only lower confidence; a person approves.
 """
+
 from typing import Literal
 
 from pydantic import BaseModel
@@ -64,8 +65,10 @@ def find_quote(quote: str, text: str) -> tuple[str, float, int | None, int | Non
 
 def gate1(db: Session, project_id: str, claims: list[Claim]) -> None:
     codes = {c.cited_code for claim in claims for c in claim.citations}
-    units = {u.code: u for u in db.query(EvidenceUnit).filter(
-        EvidenceUnit.project_id == project_id, EvidenceUnit.code.in_(codes or {""})).all()}
+    units = {
+        u.code: u
+        for u in db.query(EvidenceUnit).filter(EvidenceUnit.project_id == project_id, EvidenceUnit.code.in_(codes or {""})).all()
+    }
     for claim in claims:
         labels = []
         for cit in claim.citations:
@@ -78,8 +81,11 @@ def gate1(db: Session, project_id: str, claims: list[Claim]) -> None:
             if cit.match == "exact":
                 labels.append(unit.access_label)
         # A claim is as sensitive as the most sensitive evidence that supports it.
-        claim.access_label = max(labels) if labels else max(
-            [units[c.cited_code].access_label for c in claim.citations if c.cited_code in units] or [1])
+        claim.access_label = (
+            max(labels)
+            if labels
+            else max([units[c.cited_code].access_label for c in claim.citations if c.cited_code in units] or [1])
+        )
 
 
 def valid_citations(claim: Claim):
@@ -131,13 +137,27 @@ def _claim_line(claim: Claim) -> str:
 
 
 def gate2(db: Session, claims: list[Claim]) -> list[str]:
-    """Support check for claims that passed gate 1. Returns warnings."""
+    """Support check for claims that passed gate 1, several batches at a time. Returns warnings."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from ..config import get_settings
+    from ..db import SessionLocal
+
     todo = [c for c in claims if valid_citations(c)]
+    batches = [todo[i : i + SUPPORT_BATCH] for i in range(0, len(todo), SUPPORT_BATCH)]
+    prompts = ["Claims to check:\n\n" + "\n\n".join(_claim_line(c) for c in b) for b in batches]
+
+    def ask(prompt: str) -> SupportResult:
+        with SessionLocal() as tdb:
+            return call_json(tdb, "support", SUPPORT_SYSTEM, prompt, SupportResult)[0]
+
+    if len(prompts) <= 1:
+        results = [call_json(db, "support", SUPPORT_SYSTEM, p, SupportResult)[0] for p in prompts]
+    else:
+        with ThreadPoolExecutor(max_workers=max(1, min(get_settings().ai_concurrency, len(prompts)))) as pool:
+            results = list(pool.map(ask, prompts))
     warnings = []
-    for i in range(0, len(todo), SUPPORT_BATCH):
-        batch = todo[i:i + SUPPORT_BATCH]
-        prompt = "Claims to check:\n\n" + "\n\n".join(_claim_line(c) for c in batch)
-        result, _ = call_json(db, "support", SUPPORT_SYSTEM, prompt, SupportResult)
+    for batch, result in zip(batches, results, strict=False):
         by_ref = {v.claim_ref.strip().upper(): v for v in result.verdicts}
         for c in batch:
             v = by_ref.get(c.code.upper())
@@ -171,6 +191,9 @@ def base_confidence(claim: Claim) -> str:
     if claim.support in ("contradicts", "unrelated") or claim.support is None:
         return "unverified"
     if claim.support == "partial":
+        return "weak"
+    if all("instructions" in ((c.evidence.flags if c.evidence else None) or []) for c in valid):
+        # Every quote comes from text written to an AI (possible prompt injection): never "verified" on its own.
         return "weak"
     sources = {c.evidence.source_id for c in valid if c.evidence is not None}
     return "corroborated" if len(sources) >= 2 else "verified"

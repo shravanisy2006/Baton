@@ -1,4 +1,5 @@
 """Build the handover from approved claims only. Every item carries its evidence references."""
+
 from sqlalchemy.orm import Session
 
 from ..detect.service import _names_match
@@ -34,18 +35,41 @@ def _item(c: Claim) -> dict:
     evidence = []
     for cit in valid_citations(c):
         ev = cit.evidence
-        evidence.append({
-            "evidence_id": ev.id, "code": ev.code, "source": ev.source.filename, "kind": ev.kind,
-            "source_type": ev.source.kind, "match": cit.match,
-            "author": ev.author, "date": ev.occurred_at, "location": ev.location, "quote": cit.quote,
-            "start": cit.start, "end": cit.end, "access_level": ev.access_label, "url": ev.location.get("url"),
-        })
+        evidence.append(
+            {
+                "evidence_id": ev.id,
+                "code": ev.code,
+                "source": ev.source.filename,
+                "kind": ev.kind,
+                "source_type": ev.source.kind,
+                "match": cit.match,
+                "author": ev.author,
+                "date": ev.occurred_at,
+                "location": ev.location,
+                "quote": cit.quote,
+                "start": cit.start,
+                "end": cit.end,
+                "access_level": ev.access_label,
+                "url": ev.location.get("url"),
+            }
+        )
     return {
-        "claim_id": c.id, "code": c.code, "type": c.type, "subject": c.subject, "text": c.statement,
+        "claim_id": c.id,
+        "code": c.code,
+        "type": c.type,
+        "subject": c.subject,
+        "text": c.statement,
         "review_state": c.review_state,
-        "status": c.status, "owner": c.owner, "owner_reassigned": c.owner_reassigned, "rationale": c.rationale,
-        "confidence": c.confidence, "leaver_note": c.leaver_note, "reviewer_note": c.reviewer_note,
-        "leaver_evidence_id": c.leaver_evidence_id, "access_level": c.access_label, "evidence": evidence,
+        "status": c.status,
+        "owner": c.owner,
+        "owner_reassigned": c.owner_reassigned,
+        "rationale": c.rationale,
+        "confidence": c.confidence,
+        "leaver_note": c.leaver_note,
+        "reviewer_note": c.reviewer_note,
+        "leaver_evidence_id": c.leaver_evidence_id,
+        "access_level": c.access_label,
+        "evidence": evidence,
     }
 
 
@@ -89,11 +113,15 @@ def build_snapshot(db: Session, project: Project) -> dict:
             sections["unfinished"].append(item)
     # Next actions: every open task or blocker, most urgent first, with a plain instruction.
     urgency = {"reopened": 0, "blocked": 1, "in_progress": 2, "todo": 3, "unknown": 4, None: 5}
-    open_work = [i for i in sections["own"] + sections["unfinished"] + sections["dependencies"]
-                 if i["type"] in ("task", "blocker") and i.get("status") != "done"]
+    open_work = [
+        i
+        for i in sections["own"] + sections["unfinished"] + sections["dependencies"]
+        if i["type"] in ("task", "blocker") and i.get("status") != "done"
+    ]
     for i in sorted(open_work, key=lambda i: urgency.get(i.get("status"), 5)):
-        verb = {"reopened": "Fix and re-test", "blocked": "Unblock", "in_progress": "Finish",
-                "todo": "Start"}.get(i.get("status") or "", "Check the status of")
+        verb = {"reopened": "Fix and re-test", "blocked": "Unblock", "in_progress": "Finish", "todo": "Start"}.get(
+            i.get("status") or "", "Check the status of"
+        )
         if i["type"] == "blocker":
             verb = "Unblock"
         action = f"{verb}: {i['text']}"
@@ -114,18 +142,32 @@ def build_snapshot(db: Session, project: Project) -> dict:
             for item in by_claim.get(g.claim_id, []):
                 item["open_gap"] = g.question
             continue
-        sections["questions"].append({
-            "claim_id": None, "code": None, "type": "gap", "text": g.question, "confidence": "unknown",
-            "access_level": g.access_label, "evidence": [], "gap_kind": g.kind,
-        })
+        sections["questions"].append(
+            {
+                "claim_id": None,
+                "code": None,
+                "type": "gap",
+                "text": g.question,
+                "confidence": "unknown",
+                "access_level": g.access_label,
+                "evidence": [],
+                "gap_kind": g.kind,
+            }
+        )
     return {
         "approved_claim_ids": sorted(fingerprint(c) for c in claims),
         "project": project.name,
         "departing": departing.name if departing else None,
         "incoming": incoming.name if incoming else None,
-        "sections": [{"key": k, "title": t, "items": sections[k],
-                      "note": (f"Work {departing.name} owned, which now passes to you." if k == "own" and departing else None)}
-                     for k, t in SECTIONS],
+        "sections": [
+            {
+                "key": k,
+                "title": t,
+                "items": sections[k],
+                "note": (f"Work {departing.name} owned, which now passes to you." if k == "own" and departing else None),
+            }
+            for k, t in SECTIONS
+        ],
     }
 
 
@@ -178,10 +220,16 @@ def diff_snapshots(old: dict | None, new: dict) -> dict:
                 added.append({"text": _summary(item), "access_level": item.get("access_level", 1)})
             elif any(prev.get(f) != item.get(f) for f in ("text", "status", "owner", "confidence", "rationale")):
                 item["change"] = "changed"
-                changed.append({"before": _summary(prev), "after": _summary(item),
-                                "access_level": max(prev.get("access_level", 1), item.get("access_level", 1))})
-        removed = [{"text": _summary(i), "access_level": i.get("access_level", 1)}
-                   for k, i in before.items() if k not in now_keys]
+                changed.append(
+                    {
+                        "before": _summary(prev),
+                        "after": _summary(item),
+                        "access_level": max(prev.get("access_level", 1), item.get("access_level", 1)),
+                    }
+                )
+        removed = [
+            {"text": _summary(i), "access_level": i.get("access_level", 1)} for k, i in before.items() if k not in now_keys
+        ]
         if added or changed or removed:
             sections[sec["key"]] = {"added": added, "changed": changed, "removed": removed}
             total += len(added) + len(changed) + len(removed)

@@ -1,0 +1,12 @@
+[tool.ruff]
+line-length = 130
+target-version = "py312"
+extend-exclude = ["migrations/versions/0001_baseline.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I"]
+# B008: FastAPI's Depends(...) in argument defaults is the framework's documented pattern.
+ignore = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

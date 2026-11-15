@@ -52,7 +52,7 @@ copy .env.example .env.local
 npm run dev
 ```
 
-Open http://localhost:5173. Click **Try it with your project** and create an account (local only; no email is sent) to hand over your own files, or **See how it works → Open the example** for the worked example. The first analysis calls Gemini (about 20–60 seconds). Running it again reuses the saved answers and is instant.
+Open http://localhost:5173. Click **Start with your own project** and create an account (local only; no email is sent unless you set `RESEND_API_KEY`) to hand over your own files, or **Try the demo** for a private copy of the demo project. The first analysis calls Gemini (about 20–60 seconds). Running it again reuses the saved answers and is instant.
 
 To test invites on one computer, copy the invite link from **Overview → People → Invite** and open it in a private (incognito) window with a second account.
 

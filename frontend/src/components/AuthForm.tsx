@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useSession } from "../lib/session";
 import { Button, ErrorBox, input } from "./ui";
@@ -54,7 +55,14 @@ export default function AuthForm({
       </div>
       <form onSubmit={submit} className="space-y-3">
         {mode === "signup" && (
-          <input className={input} placeholder="Your name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} required />
+          <input
+            className={input}
+            placeholder="Your name"
+            autoComplete="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
         )}
         <input
           className={input}
@@ -84,6 +92,14 @@ export default function AuthForm({
             {mode === "signup"
               ? "Free. Your projects stay with your account, on any device. Passwords are stored only as a salted hash."
               : "Use the email and password you signed up with."}
+            {mode === "signin" && (
+              <>
+                {" "}
+                <Link to="/forgot-password" className="text-brand-700 hover:underline">
+                  Forgot your password?
+                </Link>
+              </>
+            )}
           </p>
         )}
       </form>

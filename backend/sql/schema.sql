@@ -33,12 +33,15 @@ CREATE TABLE IF NOT EXISTS users (
 	email VARCHAR(255), 
 	password_hash VARCHAR(255), 
 	merged_into VARCHAR(24), 
+	session_version INTEGER DEFAULT '0' NOT NULL, 
+	email_verified_at TIMESTAMP WITH TIME ZONE, 
+	deleted_at TIMESTAMP WITH TIME ZONE, 
 	created_at TIMESTAMP WITH TIME ZONE NOT NULL, 
 	PRIMARY KEY (id), 
 	FOREIGN KEY(account_id) REFERENCES accounts (id)
 );
 CREATE INDEX IF NOT EXISTS ix_users_account_id ON users (account_id);
-CREATE INDEX IF NOT EXISTS ix_users_email ON users (email);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email ON users (email);
 
 CREATE TABLE IF NOT EXISTS projects (
 	id VARCHAR(24) NOT NULL, 
@@ -56,6 +59,20 @@ CREATE TABLE IF NOT EXISTS projects (
 	FOREIGN KEY(incoming_user_id) REFERENCES users (id)
 );
 CREATE INDEX IF NOT EXISTS ix_projects_account_id ON projects (account_id);
+
+CREATE TABLE IF NOT EXISTS tokens (
+	id VARCHAR(24) NOT NULL, 
+	user_id VARCHAR(24) NOT NULL, 
+	kind VARCHAR(16) NOT NULL, 
+	token_hash VARCHAR(64) NOT NULL, 
+	expires_at TIMESTAMP WITH TIME ZONE NOT NULL, 
+	used_at TIMESTAMP WITH TIME ZONE, 
+	created_at TIMESTAMP WITH TIME ZONE NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_tokens_token_hash ON tokens (token_hash);
+CREATE INDEX IF NOT EXISTS ix_tokens_user_id ON tokens (user_id);
 
 CREATE TABLE IF NOT EXISTS audit_events (
 	id SERIAL NOT NULL, 
@@ -78,6 +95,7 @@ CREATE TABLE IF NOT EXISTS claims (
 	code VARCHAR(16) NOT NULL, 
 	type VARCHAR(24) NOT NULL, 
 	subject VARCHAR(200) NOT NULL, 
+	topic VARCHAR(200), 
 	statement TEXT NOT NULL, 
 	original_statement TEXT NOT NULL, 
 	status VARCHAR(24), 
@@ -102,6 +120,20 @@ CREATE TABLE IF NOT EXISTS claims (
 	FOREIGN KEY(project_id) REFERENCES projects (id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS ix_claims_project_id ON claims (project_id);
+
+CREATE TABLE IF NOT EXISTS email_log (
+	id VARCHAR(24) NOT NULL, 
+	project_id VARCHAR(24), 
+	kind VARCHAR(32) NOT NULL, 
+	to_hint VARCHAR(80) NOT NULL, 
+	subject VARCHAR(200) NOT NULL, 
+	status VARCHAR(16) NOT NULL, 
+	error TEXT, 
+	created_at TIMESTAMP WITH TIME ZONE NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(project_id) REFERENCES projects (id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS ix_email_log_project_id ON email_log (project_id);
 
 CREATE TABLE IF NOT EXISTS handover_versions (
 	id VARCHAR(24) NOT NULL, 
@@ -146,6 +178,9 @@ CREATE TABLE IF NOT EXISTS jobs (
 	kind VARCHAR(24) NOT NULL, 
 	status VARCHAR(16) NOT NULL, 
 	stage VARCHAR(40) NOT NULL, 
+	actor_id VARCHAR(24), 
+	attempts INTEGER DEFAULT '0' NOT NULL, 
+	started_at TIMESTAMP WITH TIME ZONE, 
 	warnings JSON NOT NULL, 
 	error TEXT, 
 	stats JSON NOT NULL, 
@@ -155,6 +190,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 	FOREIGN KEY(project_id) REFERENCES projects (id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS ix_jobs_project_id ON jobs (project_id);
+CREATE INDEX IF NOT EXISTS ix_jobs_status ON jobs (status);
 
 CREATE TABLE IF NOT EXISTS memberships (
 	id SERIAL NOT NULL, 
@@ -260,6 +296,7 @@ CREATE TABLE IF NOT EXISTS evidence_units (
 	location JSON NOT NULL, 
 	access_label INTEGER NOT NULL, 
 	analysed_at TIMESTAMP WITH TIME ZONE, 
+	flags JSON DEFAULT '[]' NOT NULL, 
 	PRIMARY KEY (id), 
 	FOREIGN KEY(project_id) REFERENCES projects (id) ON DELETE CASCADE, 
 	FOREIGN KEY(source_id) REFERENCES sources (id) ON DELETE CASCADE
@@ -320,8 +357,10 @@ ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE llm_cache ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE claims ENABLE ROW LEVEL SECURITY;
+ALTER TABLE email_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE handover_versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;

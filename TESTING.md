@@ -1,93 +1,115 @@
 # Testing
 
-Three layers: automated end-to-end tests of the API, scripted browser click-throughs of the main journeys, and manual
-checks with the real Gemini model and on the deployed site.
+Five layers, all in the repository and run by CI (`.github/workflows/ci.yml`) on every push:
 
-## 1. Automated tests (29)
+| Layer | Where | Count | Last result |
+| --- | --- | --- | --- |
+| API tests (end to end through the HTTP API, scripted AI) | `backend/tests` | 51 | **51 passed** on SQLite (Python 3.12 and 3.15) and on PostgreSQL 16 |
+| Component tests (Vitest + Testing Library) | `frontend/src/test` | 17 | **17 passed** |
+| Browser journeys (Playwright, real frontend + real API, scripted AI) | `frontend/e2e` | 5 | **5 passed** |
+| Lint and format | ruff (backend), ESLint + Prettier + `tsc` (frontend) | — | clean |
+| AI evaluation on a labelled project | `backend/eval` | 20 facts, 2 traps, 3 conflicts, 13 questions | offline retrieval measured; live run needs the Gemini key (see below) |
+
+Backend line coverage: **88%** (`pytest --cov=app`).
+
+The scripted AI (`backend/tests/conftest.py`) makes deliberate mistakes — an invented quote, a quote with one changed
+word, a citation of evidence that doesn't exist, a real quote that doesn't support its claim — and the tests check that
+Baton catches each one. It is a test double only; the deployed app uses Gemini.
+
+## Run them
 
 ```powershell
 cd backend
-.venv\Scripts\python -m pytest -q
+.venv\Scripts\python -m pytest -q                       # API tests (SQLite)
+$env:TEST_DATABASE_URL="postgresql://..."; .venv\Scripts\python -m pytest -q   # same tests on Postgres
+.venv\Scripts\python -m ruff check app tests eval migrations
+cd ..\frontend
+npm run lint; npm test; npm run build
+$env:PYTHON="..\backend\.venv\Scripts\python.exe"; npx playwright test   # starts both servers itself
 ```
 
-They run against SQLite by default and against Postgres with `TEST_DATABASE_URL=postgresql://...`. They use a scripted
-stand-in for Gemini (`tests/conftest.py`) that makes deliberate mistakes on purpose: an invented quote, a quote with
-one changed word, a citation of evidence that doesn't exist, and a real quote that doesn't support its claim. Each test
-checks that Baton catches the mistake.
+## API tests
 
-**Last run: 29 passed on SQLite with Python 3.12, and on PostgreSQL 16** (the first 24 also on Python 3.13, 3.14 and 3.15). A Round 2 database was also upgraded in place to the Round 3 schema without data loss (new columns are added at
-startup; evidence that was already analysed is marked as such).
+### Core workflow (`test_workflow.py`, 14)
+Uploads (PDF, DOCX, CSV; unsupported and empty files refused with a reason) · secret and phone redaction · quote matcher
+(exact accepted; one changed word and invented quotes rejected) · findings generated and checked (invented quote,
+missing evidence and unsupported claims caught) · highlight offsets · one conflict per topic with the newer side
+marked; timeline check; gaps · leaver's answers become labelled evidence · review rules (unbacked needs a reason;
+disagreements block approval; only reviewers review) · handover from approved findings only, every line linked; Restricted
+hidden from Leads · role-based access (drafts, findings and audit hidden from new member/viewer; other projects 404;
+no token 401) · missing AI key reported · corrected findings labelled · WhatsApp, Slack and GitHub JSON imports · a
+judge's own project from sign-up to the new member's handover.
 
-### Core workflow (`tests/test_workflow.py`, 14 tests)
+### Round 3 features (`test_round3.py`, 15)
+Accounts and bad input; the old guest workspace is gone; demo addresses can't be registered · invites (create,
+replace, accept once, revoke, preview, remove; real names in the audit log) · demo copies keep person switching ·
+living handover (update run reads only new evidence, keeps decisions, flags changed lines with the newer quote, version 2
+diff, acknowledgement carry-over) · GitHub re-sync adds only new items · Ask Baton (checked, highlighted quotes;
+invented quote → "can't answer"; Restricted never reaches a Leads reader) · unanswered question → leaver → answer
+cited next time · repeated actions give clean 409/404/422 · **demo sign-ins open private copies** (a second judge gets a
+different copy, can't open the first one's, and their upload doesn't change it; restart gives a fresh copy and deletes
+the old one) · old demo copies cleaned up after 24 h · scans and photos transcribed · scan while the AI is down is
+reported · generated PDF respects access · busy AI retried, leftovers finished later · second opinion.
 
-| Scenario | Test | Result |
-| --- | --- | --- |
-| Upload PDF, DOCX, CSV; reject unsupported and empty files with a reason | `test_upload_pdf_docx_csv_and_reject_unsupported` | Pass |
-| Secrets and phone numbers redacted before storage | `test_redaction_removes_secrets` | Pass |
-| Quote matcher: exact accepted, one changed word and invented quotes rejected | `test_quote_matcher_exact_fuzzy_and_invented` | Pass |
-| Claims generated and verified; invented quote, missing evidence and unsupported claims caught | `test_demo_analysis_generates_and_verifies_claims` | Pass |
-| Highlight offsets point at the exact quoted words | `test_claim_detail_has_highlight_offsets` | Pass |
-| Four sources on one topic give ONE conflict with the newer side marked; timeline check; gaps | `test_conflict_and_gaps_detected` | Pass |
-| Leaver's answers become attested evidence | `test_leaver_answer_becomes_attested_evidence` | Pass |
-| Review rules: unverified needs a reason; conflicts block approval; only reviewers review | `test_review_rules` | Pass |
-| Handover from approved claims only; every line links to evidence the reader may open; Restricted hidden from Leads | `test_handover_generation_links_and_role_views` | Pass |
-| Role-based access: drafts, raw claims and audit hidden from new member/viewer; other projects 404; no token 401 | `test_access_control` | Pass |
-| Missing AI key reported clearly | `test_ai_not_configured_is_reported` | Pass |
-| Corrected claims enter the handover, labelled | `test_corrected_state_enters_handover` | Pass |
-| WhatsApp, Slack, GitHub JSON imports: one unit per message with author and time | `test_chat_and_json_imports` | Pass |
-| A judge's own project from sign-up to the new member's handover | `test_own_project_from_scratch` | Pass |
+### Security, privacy, reliability (`test_hardening.py`, 18)
 
-### Round 3 (`tests/test_round3.py`, 15 tests)
-
-| Scenario | Test | Result |
-| --- | --- | --- |
-| Sign up / sign in; short password, bad email, duplicate email (any case), wrong password, garbage token; guests can't create projects | `test_signup_signin_and_bad_input` | Pass |
-| A guest who signs up keeps their workspace | `test_guest_upgrades_in_place` | Pass |
-| Invite: only reviewers create links; public preview; a new link revokes the old; accept once; joined person can't be previewed; revoked link refused; remove access is immediate; can't remove yourself; audit records the real name | `test_invite_accept_preview_and_remove` | Pass |
-| The worked example keeps one-click person switching and refuses invites | `test_demo_still_switches_people` | Pass |
-| Living handover: "no new evidence" refused; update run reads only the 2 new pieces; every earlier approval kept; affected approved line flagged for the new member; settle → version 2 with diff (added and removed lines); acknowledgements carried over only for unchanged sections | `test_living_handover_update_flags_changes_and_versions` | Pass |
-| GitHub re-sync adds only new items; nothing new → no job | `test_github_resync_adds_only_new_items` | Pass |
-| Ask Baton: answer with exact, highlighted quotes; invented quote → "can't answer"; Restricted evidence never reaches a Leads member; bad questions rejected | `test_ask_baton_cites_checked_quotes_and_respects_access` | Pass |
-| Unanswered question → sent to the leaver → answered → the next question is answered from that answer, cited | `test_ask_unanswered_goes_to_leaver_and_comes_back_as_evidence` | Pass |
-| Same action twice (resolve, dismiss, approve, acknowledge, send) and unknown IDs give clean 409/404/422, never a crash | `test_repeated_actions_are_safe` | Pass |
-| Demo accounts: shared project built through the API (approved v1, both people joined); sign in as each; strangers can't reset; reset restores the starting state | `test_judge_demo_accounts_and_reset` | Pass |
-| Scanned PDF and a photo are transcribed into evidence labelled as AI transcriptions; claims cite them with checked quotes | `test_scans_and_images_are_transcribed` | Pass |
-| A scan uploaded while the AI is down is reported clearly, not crashed or half-saved | `test_scan_when_ai_is_down_is_reported_not_crashed` | Pass |
-| Handover PDF is a real PDF file with a proper filename; hidden lines stay hidden; non-members refused | `test_handover_pdf_is_a_real_file_and_respects_access` | Pass |
-| Busy AI: the batch is retried after a wait; if still busy the job says "Nothing was lost", and the next run finishes only the leftovers | `test_busy_ai_is_retried_and_leftovers_finish_later` | Pass |
-| Second opinion: a real quote the first check rejected is re-judged by the other model; refused when the quote isn't real, when it already agrees, or for non-reviewers | `test_second_opinion_for_an_over_strict_support_check` | Pass |
-
-## 2. Browser click-throughs (Playwright, Chromium)
-
-Run against the built frontend and the API with the scripted AI, as a first-time visitor with no instructions.
-
-| Journey | Steps | Result |
-| --- | --- | --- |
-| Reviewer, own project | Home → Try it → create account → project with leaver and new member → upload 7 sample files with labels → Run analysis → settle conflicts → approve/reject all claims → generate → approve | Pass |
-| Invite and join | Overview → Invite → copy link → **second browser** → invite page → create account → Join → lands on the handover | Pass |
-| Preview | Reviewer previews as the leaver (banner shown) → answers a question → logged as "reviewer (for leaver)" → Back to me | Pass |
-| Ask Baton | New member asks a question → answer with highlighted quote; asks something not in the files → "won't guess" → Ask the leaver → answer appears with citation | Pass |
-| Living handover | Reviewer uploads a newer standup note → "Analyse 2 new pieces" → banner "approved lines changed" → handover lines flagged → settle → approve new claim → Make version 2 → diff panel → approve → new member sees version 2 and its diff | Pass |
-| Refresh and session | New member reloads the handover page: still signed in, same view | Pass |
-| Demo accounts | Home page → one-click Sign in as Karan → handover; sign out → sign in as Priya → upload the downloadable newer note → Analyse → changed lines flagged → Reset to the starting state | Pass |
-| Worked example | Open the example → analysis → switch Priya / Riya / Karan → gaps → "not shared yet" for Karan before approval | Pass |
-| Bad input and empty states | Invalid invite link, signed-out project link, wrong password, unknown project id, empty Ask history, no handover yet | Pass: clear message and a way out each time |
-| Phone width (iPhone 13) | Sign in, projects, overview with People, Ask Baton | Pass |
-| Round 2 fixes | Demo reviewer → handover → **Download PDF** saves a real `.pdf`; upload a whiteboard photo → "transcribed by AI" note; Review → **Ask the AI again (second opinion)** → Gate 2 updates with the reason | Pass |
-| Errors in the browser console | All journeys above | None |
-
-## 3. Manual checks with real services
-
-| Check | Status |
+| Scenario | Test |
 | --- | --- |
-| Real Gemini accepts Baton's JSON schemas (`python scripts/check_ai.py`) | Pass on Shravani's PC (Round 2) |
-| Real Gemini analysis of the worked example | Pass on Shravani's PC: 28 evidence pieces, 28 claims, 14 verified, 2 conflicts (1 timeline), 5 gaps |
-| Deployed site in an incognito window: worked example and own project end to end | Pass (Round 2 deployment) |
-| Round 3 on the deployed site: accounts, invite in a second browser, Ask Baton with real Gemini, update run with real Gemini | To be re-checked after the final push (see SUBMISSION.md) |
+| 8 wrong passwords from one network block only that network for that email; the real person elsewhere signs in | `test_failed_signins_cannot_lock_out_someone_else` |
+| Nobody can lock the published demo sign-ins | `test_demo_signins_cannot_be_locked_by_others` |
+| Demo copies (12/h) and sign-ups (10/h) limited per network; other networks unaffected | `test_anonymous_creation_is_rate_limited` |
+| Password change signs out other devices; wrong current password refused; sign out everywhere ends this session too | `test_sign_out_everywhere_and_password_change_revoke_old_sessions` |
+| The API refuses to start on Render with the development secret | `test_production_refuses_the_development_secret` |
+| CORS allows only configured origins (an arbitrary `*.vercel.app` is refused) | `test_cors_allows_only_configured_origins` |
+| Duplicate email rejected by the database itself | `test_email_is_unique_in_the_database` |
+| 11 files → 413; 10 MB + 1 byte refused; helpful unsupported-type message; original not stored; secret redacted | `test_upload_limits_and_originals_not_kept` |
+| "Ignore all previous instructions…" flagged; stricter prompt used; a supported finding based only on it stays *Partly backed* | `test_injected_instructions_are_flagged_and_never_verified` |
+| Deleting a Restricted file removes its contact from the handover, findings and evidence | `test_delete_source_removes_its_evidence_everywhere` |
+| Project deletion needs the admin and the exact name; no rows left in any table | `test_delete_project_needs_admin_and_exact_name` |
+| Account deletion: password required; joined member leaves others' project; owner's project deleted; address reusable | `test_delete_account` |
+| Email not configured → `not_configured`, link still returned; password reset says email is unavailable | `test_email_not_configured_is_reported_honestly` |
+| Email configured (mock Resend): invite emailed; link locked to the address; confirmation required; single-use; provider failure recorded as `failed`; password reset by email | `test_invite_email_lock_and_delivery` |
+| Worker thread runs a queued job; a job interrupted by a restart is resumed and its partial results removed | `test_worker_thread_runs_queued_jobs_and_resumes_after_restart` |
+| `/health` reports database, AI, email and job queue | `test_health_reports_database_and_jobs` |
+| A Round 3 database (migration 0001, with two users sharing an email) upgrades to head; oldest keeps the address; re-running is a no-op | `test_migrations_upgrade_a_round3_database_without_data_loss` |
+| The old shared judge project and demo-address accounts are removed; an old guest workspace with real work is kept | `test_old_shared_demo_is_removed_but_real_work_is_kept` |
+
+### AI guardrails (`test_ai_quality.py`, 4)
+Stemmed retrieval and AI keywords (a question sharing no words with the answer finds it only with the keywords) ·
+a rephrased question answered with a checked quote · differently worded subjects produce a conflict only after topic
+grouping, and subject names the AI invents are ignored · invalid JSON retried then accepted; schema-invalid output
+rejected.
+
+## Browser journeys (`frontend/e2e`, Playwright)
+
+| Journey | Checks |
+| --- | --- |
+| `full-journey` | Sign up → create project → upload 7 files with labels → analyse → decide disagreements → review every finding → generate and approve v1 → invite → **second browser** joins with own account → Ask Baton (answered with highlight; unanswered → sent to leaver) → newer file → "out of date" → decide → version 2 with "What changed since version 1" → new member sees v2, still signed in after refresh; no page errors |
+| `demo-and-mobile` | One-click demo opens a private, handed-over copy; switching to the new member opens the handover · two browsers using the same demo sign-in get different copies and can't open each other's |
+| `phone` | Phone size: menu opens, Review reachable, no sideways scrolling |
+| `account-and-deletion` | Delete a file (summary shown), delete the project (typed name), change password, delete account, old password refused |
+
+Database changes were also checked by hand: a PostgreSQL database created by the Round 3 code (with a real user and
+project) was opened by the new code; it was migrated to `0002`, RLS was enabled on the new tables, the unique email index
+was created and the data was kept.
+
+## AI evaluation (`backend/eval`)
+
+See [backend/eval/README.md](backend/eval/README.md). Measured so far (offline, no AI): correct evidence in the top 3 for
+4/4 literal and 3/5 rephrased questions. The live run (facts recall, verified precision, traps, conflicts, Ask Baton
+answers and refusals) needs the Gemini key and is run with `python -m eval.run_eval`; its results are committed to
+`backend/eval/results/` when run. **No live numbers are claimed until then.**
+
+## Measured performance fixes
+
+- Uploading a scan no longer blocks the server: `/health` during a 6-second scan transcription took **5.03 s before**,
+  **0.004 s after** (same machine, scripted AI with a 6 s delay).
+- The demo copy (analysis + review + version 1) is built in about 0.4 s with saved answers and the scripted AI; with live
+  Gemini it adds one topic-grouping call the first time.
 
 ## Known limits (not bugs)
 
-- Baton does not send email; invite links are copied or sent from the reviewer's own mail app.
-- Gemini's free tier can be busy (503) or rate-limited (429). Baton falls back to the backup model, waits and retries the
-  batch once, and otherwise shows a clear message; nothing is half-saved and the next run finishes only what's left.
-- Scans are transcribed by Gemini (up to 8 pages per file); with no AI available they're reported, not read.
+- Without `RESEND_API_KEY`/`EMAIL_FROM`, no email is sent; the app says so and shows links to copy.
+- Gemini's free tier can be busy (503) or rate-limited (429): backup model, wait and retry, then a clear message;
+  nothing is half-saved.
+- Rate limits and workers are per API process (one process today).

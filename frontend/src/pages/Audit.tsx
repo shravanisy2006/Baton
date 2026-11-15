@@ -25,7 +25,10 @@ export default function AuditPage() {
   const { data, error, loading, reload } = useApi(() => api.get<Event[]>(`/projects/${o.project.id}/audit`), [o.project.id]);
   return (
     <div>
-      <PageHeader title="Audit log" subtitle="Append-only record of who did what and when: uploads, analysis runs, review decisions, approvals, views and acknowledgements." />
+      <PageHeader
+        title="Audit log"
+        subtitle="Append-only record of who did what and when: uploads, analysis runs, review decisions, approvals, views and acknowledgements."
+      />
       {loading && <Spinner />}
       {error && <ErrorBox message={error.message} onRetry={reload} />}
       {data && data.length === 0 && <Empty icon={<ScrollText className="h-8 w-8" />} title="No events yet" />}

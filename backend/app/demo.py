@@ -4,6 +4,7 @@ All demo content is invented (see backend/seed/eventapp/README.md). Each visitor
 so judges can approve, reject and resolve things without affecting anyone else. The AI pipeline runs
 for real; its responses are cached, so repeat demos cost no API quota.
 """
+
 from sqlalchemy.orm import Session
 
 from .audit.service import log as audit
@@ -42,10 +43,13 @@ def create_demo(db: Session, account: Account) -> tuple[Project, User, Job]:
         users[role] = (u, level)
     db.flush()
     project = Project(
-        account_id=account.id, name="EventApp", is_demo=True,
+        account_id=account.id,
+        name="EventApp",
+        is_demo=True,
         description="Synthetic demo: a college club's event registration app. Backend lead Riya is leaving; "
-                    "Karan is taking over.",
-        departing_user_id=users["departing"][0].id, incoming_user_id=users["incoming"][0].id,
+        "Karan is taking over.",
+        departing_user_id=users["departing"][0].id,
+        incoming_user_id=users["incoming"][0].id,
     )
     db.add(project)
     db.flush()
@@ -55,15 +59,27 @@ def create_demo(db: Session, account: Account) -> tuple[Project, User, Job]:
     for filename, label in SEED_FILES:
         data = (SEED_DIR / filename).read_bytes()
         kind, parsed = parse_file(data, filename)
-        src = Source(project_id=project.id, kind=kind,
-                     filename=filename, access_label=label, authorised_by=reviewer.id,
-                     storage_path=f"seed://eventapp/{filename}")
+        src = Source(
+            project_id=project.id,
+            kind=kind,
+            filename=filename,
+            access_label=label,
+            authorised_by=reviewer.id,
+            storage_path=f"seed://eventapp/{filename}",
+        )
         db.add(src)
         db.flush()
         store_units(db, src, parsed)
     job = Job(project_id=project.id)
     db.add(job)
     db.flush()
-    audit(db, project.id, reviewer, "demo.created", "project", project.id,
-          note="Synthetic EventApp data loaded for this visitor only.")
+    audit(
+        db,
+        project.id,
+        reviewer,
+        "demo.created",
+        "project",
+        project.id,
+        note="Synthetic EventApp data loaded for this visitor only.",
+    )
     return project, reviewer, job
