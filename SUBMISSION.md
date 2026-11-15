@@ -9,9 +9,9 @@
 ## 1. Complete list of features
 
 **Accounts and team**
-1. Sign up and sign in with email and password (salted scrypt hashes; repeated failed sign-ins are blocked for 15 minutes).
+1. Sign up and sign in with email and password (salted scrypt hashes; repeated failed sign-ins are slowed per network address, so nobody can lock someone else out).
 2. Create a project naming the person leaving and the person taking over, with an access level for each.
-3. One-time invite links (valid 14 days, stored only as hashes, a new link cancels the old one, revocable), copied or emailed from your own mail app.
+3. One-time invite links (valid 14 days, stored only as hashes, a new link cancels the old one, revocable). Baton emails them when an email provider is configured; otherwise the link is copied and sent by the reviewer.
 4. Joining with your own account takes over your place in the project; from then on nobody can preview as you.
 5. Preview what a not-yet-joined person sees, clearly bannered and logged as "reviewer (previewing as …)".
 6. Remove someone's access immediately; roles Admin, Reviewer, Departing, Incoming, Viewer.
@@ -32,7 +32,7 @@
 12. Gate 1: word-for-word quote check in code (altered or invented quotes rejected, offsets saved for highlighting).
 13. Gate 2: a separate AI support check, with a reviewer-requested second opinion from the other model when it looks too strict.
 13a. Prompt-injection defence: AI-directed text in uploads is flagged, never followed, and can't make a finding "backed".
-14. Confidence labels: Verified, Corroborated, Weak, Conflicting, Unverified, Leaver-attested, Reviewer-asserted.
+14. Plain-language trust labels: *Backed by source*, *Backed by 2+ sources*, *Partly backed*, *Sources disagree*, *Not backed*, *Confirmed by the leaver*, *Reviewer's decision* (internally: verified, corroborated, weak, conflicting, unverified, leaver-attested, reviewer-asserted).
 15. Status and owner conflicts, one per topic (AI groups differently worded topics; rules decide), with every source on
     each side and the newer side marked.
 16. Timeline check for decisions replaced by newer evidence.
@@ -100,8 +100,8 @@ lets Gemini draft a cited answer, and keeps only quotes that pass the same word-
 3. *Accounts layered onto an existing data model*: named people start as placeholders and are merged into real accounts
    on invite acceptance, moving memberships, acknowledgements and questions without breaking history.
 4. *Answers that can't hallucinate a source*: the model only sees permitted evidence, and every quote is re-checked in code.
-5. *Upgrading a live database in place*: new columns are added at startup, and already-analysed evidence is marked so
-   the first update run doesn't redo everything.
+5. *Upgrading a live database in place*: Alembic migrations (tested on a copy of a Round 3 Postgres database) add the
+   new tables and columns, and already-analysed evidence is marked so the first update run doesn't redo everything.
 
 ## 3. Improvements completed after Round 2
 
@@ -116,8 +116,9 @@ lets Gemini draft a cited answer, and keeps only quotes that pass the same word-
 One change of method, explained: we committed to Supabase Auth. We built Baton's own email-and-password accounts in the
 same API instead (scrypt-hashed passwords, hashed one-time invite tokens). Supabase's built-in email sender is limited to
 a few messages per hour on the free plan and needs a separate SMTP service for real use, and a second auth system would
-have split permission checks across two places. Invite links are copied or sent from the reviewer's own mail app; real
-email delivery is first on the roadmap.
+have split permission checks across two places. Email (invites, confirmation, password reset, handover updates) goes
+through Resend when `RESEND_API_KEY` is set; without it Baton says so and shows the link to copy, and never reports an
+email as sent.
 
 **Final hardening pass (after an independent audit of our own build)**
 
@@ -139,6 +140,7 @@ We audited the finished Round 3 build as an outside reviewer would and fixed wha
 | No frontend tests, lint or CI; browser tests not in the repo | Vitest, Playwright journeys in the repo, ESLint, Prettier, ruff, GitHub Actions |
 
 **Other improvements after Round 2**
+
 Every "known issue" we listed in Round 2 was worked on:
 
 | Round 2 known issue | Now |
@@ -151,12 +153,11 @@ Every "known issue" we listed in Round 2 was worked on:
 | Gemini busy / rate-limited | Backup model, then wait and retry the batch; clear "nothing was lost" message; next run finishes only leftovers |
 | Free server wakes slowly | Home page waits and explains; UptimeRobot keeps it awake; demo accounts are ready instantly |
 | Private GitHub repos need a token | Works as intended: paste a read-only GitHub token when importing a private repo (it is used for that import only); public repos need nothing |
-- Workspaces are no longer tied to one browser: sign in from any device.
 - Repeated actions (double clicks, resolving twice, accepting an invite twice) return clear messages instead of side effects.
 - Clearer errors and a way out on every failure screen; passive tips never pull users away from the page they chose.
 - Landing page explains the three new capabilities; README rewritten so anyone can clone and run it, including without a Gemini key.
 - `schema.sql` is now generated from the models (`scripts/make_schema_sql.py`).
-- Ready-made demo accounts with credentials on the website (organisers' suggestion): built at start-up through Baton's own API from the saved real Gemini answers, resettable by anyone using them.
+- Demo sign-ins with credentials on the website (organisers' suggestion): each opens a private, already handed-over copy built from the saved real Gemini answers for the example files.
 - The home page waits for a sleeping free server instead of giving up, and says so in plain words.
 
 ## 4. Testing details
