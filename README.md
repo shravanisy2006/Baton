@@ -25,8 +25,20 @@ Team Pixels (JSPM's RSCOE, Pune) · We Code Coders hackathon, Round 3 (final).
 
 ## Try it (for judges)
 
-There are two paths. A pop-up guide points at the next button at every step; close it with × and bring it back with
+There are three paths. A pop-up guide points at the next button at every step; close it with × and bring it back with
 **Show me what to do next**.
+
+### Fastest: ready-made demo accounts (shown on the home page and the sign-in page)
+
+| Person | Email | Password | Try |
+| --- | --- | --- | --- |
+| Priya Nair, reviewer | `reviewer@baton.demo` | `Baton-Judge-2026` | Download the [newer standup note](https://baton-api-haqs.onrender.com/samples/standup-2026-11-12.md), upload it on **Sources**, press **Analyse** on Overview: approved lines are flagged *Changed since approval*; settle them and **Make version 2** |
+| Riya Sharma, leaving | `riya@baton.demo` | `Baton-Judge-2026` | Answer the open questions on **Gaps & Conflicts** |
+| Karan Mehta, new member | `karan@baton.demo` | `Baton-Judge-2026` | Read the approved handover, open the evidence behind any line, **Ask Baton** |
+
+The home page has one-click **Sign in** buttons for each. They share one synthetic project that is already analysed,
+reviewed and handed over (version 1), with both people joined through invites. Use a private window to be two people at
+once. Because it is shared, anyone signed in to these accounts can press **Reset to the starting state** on its Overview.
 
 ### A. Your own project, with real accounts (about 10 minutes)
 
@@ -95,7 +107,9 @@ leaving, Karan is taking over, Priya reviews. Switch between them with **Viewing
 11. **Ask Baton:** questions answered only from evidence the asker may see, every quote checked word for word; if the
     files can't answer, Baton says so and the question can go to the leaver (or reviewer), whose answer becomes labelled
     evidence for the next person.
-12. Audit log of every upload, analysis, review decision, invite, approval, view, acknowledgement and question.
+12. **Ready-made demo accounts** for judges (reviewer, leaver, new member) on a shared, pre-reviewed project, with
+    one-click sign-in and a reset button.
+13. Audit log of every upload, analysis, review decision, invite, approval, view, acknowledgement and question.
 
 ## How verification works
 
@@ -132,7 +146,7 @@ leaving, Karan is taking over, Priya reviews. Switch between them with **Viewing
 | Parsing / matching | PyMuPDF, python-docx, pandas, RapidFuzz |
 | Auth | PyJWT sessions, scrypt password hashes (Python standard library), hashed one-time invite tokens |
 | Integrations | GitHub REST API (read-only) |
-| Tests | pytest (23 end-to-end tests with a scripted AI), Playwright browser click-throughs |
+| Tests | pytest (24 end-to-end tests with a scripted AI), Playwright browser click-throughs |
 
 Full endpoint list: [API.md](API.md). Database script: [`backend/sql/schema.sql`](backend/sql/schema.sql)
 (regenerate with `python scripts/make_schema_sql.py`).

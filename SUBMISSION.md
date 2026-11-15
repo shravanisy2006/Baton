@@ -4,6 +4,7 @@
 - **Source code:** https://github.com/shravanisy2006/Baton
 - **API and interactive docs:** https://baton-api-haqs.onrender.com/docs
 - **Product PDF:** `Team_Pixels_Baton_Final.pdf`
+- **Demo accounts (also on the home page, one-click):** `reviewer@baton.demo`, `riya@baton.demo`, `karan@baton.demo` — password `Baton-Judge-2026`
 
 ## 1. Complete list of features
 
@@ -60,7 +61,8 @@
 32. Step-by-step pop-up guide that points at the next button for each role and stage.
 33. Worked example (synthetic EventApp) with planted mistakes, no account needed, switch between its four people.
 34. Append-only audit log: uploads, analyses, review decisions, invites, joins, removals, approvals, views, acknowledgements, questions.
-35. Works on phone width; clear messages for expired links, wrong passwords, missing projects, busy AI and a sleeping server.
+35. Ready-made demo accounts for judges (reviewer, leaver, new member) on a shared project that is already analysed, reviewed and handed over, with one-click sign-in, a downloadable newer file to test the living handover, and a reset button.
+36. Works on phone width; clear messages for expired links, wrong passwords, missing projects, busy AI and a sleeping server.
 
 ## 2. Technical architecture and implementation summary
 
@@ -110,13 +112,15 @@ email delivery is first on the roadmap.
 - Clearer errors and a way out on every failure screen; passive tips never pull users away from the page they chose.
 - Landing page explains the three new capabilities; README rewritten so anyone can clone and run it, including without a Gemini key.
 - `schema.sql` is now generated from the models (`scripts/make_schema_sql.py`).
+- Ready-made demo accounts with credentials on the website (organisers' suggestion): built at start-up through Baton's own API from the saved real Gemini answers, resettable by anyone using them.
+- The home page waits for a sleeping free server instead of giving up, and says so in plain words.
 
 ## 4. Testing details
 
-- **23 automated end-to-end tests** (`backend/tests`), passing on SQLite with Python 3.12, 3.13, 3.14 and 3.15 and on
+- **24 automated end-to-end tests** (`backend/tests`), passing on SQLite with Python 3.12, 3.13, 3.14 and 3.15 and on
   PostgreSQL 16. They use a scripted AI that makes deliberate mistakes (invented quote, one changed word, missing evidence,
-  unsupported claim) and check Baton catches each one. Nine new tests cover accounts, invites, previews, removal, the
-  living handover, GitHub re-sync, Ask Baton, routing to the leaver, and repeated/bad actions.
+  unsupported claim) and check Baton catches each one. Ten new tests cover accounts, invites, previews, removal, the
+  living handover, GitHub re-sync, Ask Baton, routing to the leaver, repeated/bad actions, and the demo accounts with reset.
 - **Browser click-throughs** (Playwright): a first-time reviewer's whole journey, the invite accepted in a second browser,
   preview mode, Ask Baton, the living-handover update to version 2, page refresh, the worked example, error states, and
   phone width — with zero browser console errors.

@@ -1,5 +1,6 @@
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AuthForm from "../components/AuthForm";
+import JudgeAccounts from "../components/JudgeAccounts";
 import Logo from "../components/Logo";
 import { Card } from "../components/ui";
 
@@ -26,6 +27,9 @@ export default function SignInPage() {
           </p>
           <AuthForm initialMode={params.get("mode") === "signin" ? "signin" : "signup"} onDone={() => nav(safeNext)} />
         </Card>
+        <div className="mt-6">
+          <JudgeAccounts compact />
+        </div>
         <p className="mt-4 text-center text-xs text-slate-500">
           Just looking? <Link to="/" className="text-brand-700 hover:underline">Open the worked example</Link> — no account needed.
         </p>

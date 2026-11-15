@@ -96,7 +96,7 @@ export interface Job {
 }
 
 export interface Overview {
-  project: { id: string; name: string; description: string; is_demo: boolean; departing: string | null; incoming: string | null };
+  project: { id: string; name: string; description: string; is_demo: boolean; is_judge_demo?: boolean; departing: string | null; incoming: string | null };
   me: { user_id: string; name: string; role: string; access_level: string };
   members: Member[];
   counts: Record<string, number>;

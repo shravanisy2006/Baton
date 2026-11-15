@@ -3,7 +3,7 @@
 Three layers: automated end-to-end tests of the API, scripted browser click-throughs of the main journeys, and manual
 checks with the real Gemini model and on the deployed site.
 
-## 1. Automated tests (23)
+## 1. Automated tests (24)
 
 ```powershell
 cd backend
@@ -15,7 +15,7 @@ stand-in for Gemini (`tests/conftest.py`) that makes deliberate mistakes on purp
 one changed word, a citation of evidence that doesn't exist, and a real quote that doesn't support its claim. Each test
 checks that Baton catches the mistake.
 
-**Last run: 23 passed on SQLite with Python 3.12, 3.13, 3.14 and 3.15, and on PostgreSQL 16.** A Round 2 database was also upgraded in place to the Round 3 schema without data loss (new columns are added at
+**Last run: 24 passed on SQLite with Python 3.12, 3.13, 3.14 and 3.15, and on PostgreSQL 16.** A Round 2 database was also upgraded in place to the Round 3 schema without data loss (new columns are added at
 startup; evidence that was already analysed is marked as such).
 
 ### Core workflow (`tests/test_workflow.py`, 14 tests)
@@ -37,7 +37,7 @@ startup; evidence that was already analysed is marked as such).
 | WhatsApp, Slack, GitHub JSON imports: one unit per message with author and time | `test_chat_and_json_imports` | Pass |
 | A judge's own project from sign-up to the new member's handover | `test_own_project_from_scratch` | Pass |
 
-### Round 3 (`tests/test_round3.py`, 9 tests)
+### Round 3 (`tests/test_round3.py`, 10 tests)
 
 | Scenario | Test | Result |
 | --- | --- | --- |
@@ -50,6 +50,7 @@ startup; evidence that was already analysed is marked as such).
 | Ask Baton: answer with exact, highlighted quotes; invented quote → "can't answer"; Restricted evidence never reaches a Leads member; bad questions rejected | `test_ask_baton_cites_checked_quotes_and_respects_access` | Pass |
 | Unanswered question → sent to the leaver → answered → the next question is answered from that answer, cited | `test_ask_unanswered_goes_to_leaver_and_comes_back_as_evidence` | Pass |
 | Same action twice (resolve, dismiss, approve, acknowledge, send) and unknown IDs give clean 409/404/422, never a crash | `test_repeated_actions_are_safe` | Pass |
+| Demo accounts: shared project built through the API (approved v1, both people joined); sign in as each; strangers can't reset; reset restores the starting state | `test_judge_demo_accounts_and_reset` | Pass |
 
 ## 2. Browser click-throughs (Playwright, Chromium)
 
@@ -63,6 +64,7 @@ Run against the built frontend and the API with the scripted AI, as a first-time
 | Ask Baton | New member asks a question → answer with highlighted quote; asks something not in the files → "won't guess" → Ask the leaver → answer appears with citation | Pass |
 | Living handover | Reviewer uploads a newer standup note → "Analyse 2 new pieces" → banner "approved lines changed" → handover lines flagged → settle → approve new claim → Make version 2 → diff panel → approve → new member sees version 2 and its diff | Pass |
 | Refresh and session | New member reloads the handover page: still signed in, same view | Pass |
+| Demo accounts | Home page → one-click Sign in as Karan → handover; sign out → sign in as Priya → upload the downloadable newer note → Analyse → changed lines flagged → Reset to the starting state | Pass |
 | Worked example | Open the example → analysis → switch Priya / Riya / Karan → gaps → "not shared yet" for Karan before approval | Pass |
 | Bad input and empty states | Invalid invite link, signed-out project link, wrong password, unknown project id, empty Ask history, no handover yet | Pass: clear message and a way out each time |
 | Phone width (iPhone 13) | Sign in, projects, overview with People, Ask Baton | Pass |

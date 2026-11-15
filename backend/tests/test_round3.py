@@ -312,3 +312,37 @@ def test_repeated_actions_are_safe(client, demo):
         body = {"answer": "hello there"} if "gaps" in path else {}
         assert client.post(path, json=body, headers=tok).status_code == 404, path
     assert client.get("/projects/does-not-exist", headers=tok).status_code == 404
+
+
+# ---------- ready-made demo accounts for judges ----------
+
+def test_judge_demo_accounts_and_reset(client):
+    from app import judge
+
+    judge.reset(background=False)
+    info = client.get("/judge-demo").json()
+    assert info["status"] == "ready" and len(info["accounts"]) == 3 and info["password"]
+    tokens = {a["role"]: client.post("/auth/signin", json={"email": a["email"], "password": info["password"]}).json()["token"]
+              for a in info["accounts"]}
+    rev, karan, riya = auth(tokens["reviewer"]), auth(tokens["incoming"]), auth(tokens["departing"])
+    pid = next(p["id"] for p in client.get("/projects", headers=karan).json())
+    ov = client.get(f"/projects/{pid}", headers=rev).json()
+    assert ov["project"]["is_judge_demo"] and ov["handover"]["approved_version"] == 1
+    assert {m["name"]: m["status"] for m in ov["members"]} == {
+        "Priya Nair": "joined", "Riya Sharma": "joined", "Karan Mehta": "joined"}
+    h = client.get(f"/projects/{pid}/handover", headers=karan).json()
+    assert h["status"] == "approved" and any(s["items"] for s in h["content"]["sections"])
+    assert client.get(f"/projects/{pid}/gaps", headers=riya).status_code == 200
+
+    # A judge changes things; reset puts the shared project back.
+    client.post(f"/projects/{pid}/members/{ov['me']['user_id']}/remove", headers=rev)
+    r = client.post(f"/projects/{pid}/sources/upload", headers=rev, data={"access_label": "Team"},
+                    files=[("files", ("standup.md", UPDATE_NOTE))])
+    assert r.status_code == 200
+    stranger = signup(client)
+    assert client.post("/judge-demo/reset", headers=auth(stranger)).status_code == 403
+    judge.reset(background=False)
+    pid2 = next(p["id"] for p in client.get("/projects", headers=karan).json())
+    assert pid2 != pid and client.get(f"/projects/{pid}", headers=rev).status_code == 404
+    ov2 = client.get(f"/projects/{pid2}", headers=rev).json()
+    assert ov2["counts"]["new_evidence"] == 0 and ov2["handover"]["approved_version"] == 1

@@ -84,6 +84,7 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String(160))
     description: Mapped[str] = mapped_column(Text, default="")
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_judge_demo: Mapped[bool] = mapped_column(Boolean, default=False)  # the shared demo with ready-made accounts
     departing_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     incoming_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

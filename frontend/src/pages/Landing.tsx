@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { API_URL } from "../lib/api";
 import { useSession } from "../lib/session";
 import AccountMenu from "../components/AccountMenu";
+import JudgeAccounts from "../components/JudgeAccounts";
 import { Button, ErrorBox } from "../components/ui";
 import Logo from "../components/Logo";
 
@@ -135,6 +136,9 @@ export default function Landing() {
             <ErrorBox message={error} />
           </div>
         )}
+              <div className="mx-auto mt-10 max-w-4xl">
+          <JudgeAccounts />
+        </div>
       </section>
 
       <section id="how" className="scroll-mt-4 border-y border-slate-100 bg-slate-50 py-14">

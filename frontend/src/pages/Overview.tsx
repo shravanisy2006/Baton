@@ -1,11 +1,12 @@
 import { ArrowRight, Check, Copy, Link2, Loader2, Mail, Play, RefreshCw, RotateCcw, UserMinus, UserPlus } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { usePolling } from "../lib/hooks";
 import { ROLE_LABEL, useProject } from "../lib/session";
 import { Button, Card, cx, ErrorBox, input, Modal, Notice, PageHeader, Pill, select, Stat } from "../components/ui";
 import type { Invite, Member } from "../lib/types";
+import { API_URL } from "../lib/api";
 
 export default function OverviewPage() {
   const { overview: o, reload, role, canManage } = useProject();
@@ -140,6 +141,7 @@ export default function OverviewPage() {
         </div>
       )}
 
+      {o.project.is_judge_demo && <JudgeBanner />}
       {err && (
         <div className="mb-4">
           <ErrorBox message={err} />
@@ -411,5 +413,44 @@ function InviteModal({ invite, onClose }: { invite: (Invite & { name?: string; p
         Testing on your own? Open the link in a private (incognito) window and create a second account.
       </p>
     </Modal>
+  );
+}
+
+function JudgeBanner() {
+  const nav = useNavigate();
+  const [state, setState] = useState<"idle" | "building" | "error">("idle");
+  const [msg, setMsg] = useState<string | null>(null);
+  async function reset() {
+    if (!confirm("Reset the shared demo project to its starting state (analysed, reviewed, version 1 approved)? Changes made by anyone will be lost.")) return;
+    setState("building");
+    setMsg(null);
+    try {
+      await api.post("/judge-demo/reset");
+      for (let i = 0; i < 60; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const s = await api.get<{ status: string; error: string | null }>("/judge-demo");
+        if (s.status === "ready") return nav("/projects");
+        if (s.status === "failed") throw new Error(s.error ?? "Reset failed.");
+      }
+      throw new Error("Reset is taking longer than expected. Refresh in a minute.");
+    } catch (e) {
+      setState("error");
+      setMsg((e as Error).message);
+    }
+  }
+  return (
+    <div className="mb-4">
+      <Notice>
+        <b>Shared demo for judges.</b> Already analysed, reviewed and handed over (version 1). Try the living handover:{" "}
+        <a className="font-medium underline" href={`${API_URL}/samples/standup-2026-11-12.md`}>
+          download the newer standup note
+        </a>
+        , upload it on Sources, then press <b>Analyse</b> here. Others may be using this project too.{" "}
+        <button className="font-medium underline" disabled={state === "building"} onClick={reset}>
+          {state === "building" ? "Resetting… (about a minute)" : "Reset to the starting state"}
+        </button>
+        {msg && <span className="ml-1 text-rose-700">{msg}</span>}
+      </Notice>
+    </div>
   );
 }

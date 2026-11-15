@@ -106,6 +106,18 @@ def sample_files():
                     headers={"Content-Disposition": 'attachment; filename="baton-sample-project.zip"'})
 
 
+@router.get("/samples/standup-2026-11-12.md", tags=["system"])
+def sample_update_note():
+    """A newer (synthetic) standup note for the EventApp projects, to try the living handover."""
+    from fastapi.responses import Response
+
+    from ..config import BACKEND_DIR
+
+    data = (BACKEND_DIR / "seed" / "updates" / "standup-2026-11-12.md").read_bytes()
+    return Response(data, media_type="text/markdown",
+                    headers={"Content-Disposition": 'attachment; filename="standup-2026-11-12.md"'})
+
+
 @router.get("/projects/{project_id}")
 def project_overview(project_id: str, s=Depends(current_session), db: Session = Depends(get_db)):
     m = require_member(db, project_id, s)
@@ -138,7 +150,7 @@ def project_overview(project_id: str, s=Depends(current_session), db: Session = 
         [x for x in (m.project.departing_user_id, m.project.incoming_user_id) if x] or [""]))}
     return {
         "project": {"id": m.project.id, "name": m.project.name, "description": m.project.description,
-                    "is_demo": m.project.is_demo,
+                    "is_demo": m.project.is_demo, "is_judge_demo": bool(m.project.is_judge_demo),
                     "departing": users.get(m.project.departing_user_id),
                     "incoming": users.get(m.project.incoming_user_id)},
         "me": {"user_id": m.user.id, "name": m.user.name, "role": m.role, "access_level": LABELS[lvl]},

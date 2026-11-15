@@ -9,7 +9,8 @@ _tmp = tempfile.mkdtemp(prefix="baton-test-")
 os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{_tmp}/test.db"
 os.environ["LOCAL_STORAGE_DIR"] = f"{_tmp}/storage"
 os.environ["GEMINI_API_KEY"] = ""
-os.environ["BATON_SKIP_DEMO_CACHE"] = "1"  # tests use the scripted AI, not the saved real answers
+os.environ["BATON_SKIP_DEMO_CACHE"] = "1"
+os.environ["BATON_SKIP_JUDGE_DEMO"] = "1"  # built explicitly in its own test  # tests use the scripted AI, not the saved real answers
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytest  # noqa: E402

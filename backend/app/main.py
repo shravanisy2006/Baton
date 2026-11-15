@@ -18,6 +18,7 @@ from .projects.router import router as projects_router
 from .share.router import router as share_router
 from .sources.router import router as sources_router
 from .team.router import router as team_router
+from .judge import router as judge_router
 from .ask.router import router as ask_router
 from .verify.router import router as claims_router
 
@@ -29,6 +30,9 @@ log = logging.getLogger("baton")
 async def lifespan(_app: FastAPI):
     init_db()
     _fail_interrupted_jobs()
+    from .judge import ensure as ensure_judge_demo
+
+    ensure_judge_demo()  # builds the shared judge demo in the background if it doesn't exist yet
     if get_settings().app_secret.startswith("dev-only"):
         log.warning("APP_SECRET is the development default. Set a long random APP_SECRET in production.")
     log.info("Baton API ready. AI: %s", ai_status())
@@ -69,7 +73,7 @@ app.add_middleware(
 )
 
 for r in (auth_router, projects_router, sources_router, evidence_router, claims_router, detect_router,
-          handover_router, share_router, audit_router, team_router, ask_router):
+          handover_router, share_router, audit_router, team_router, ask_router, judge_router):
     app.include_router(r)
 
 
